@@ -1,0 +1,11 @@
+{{define "content"}}
+<div class="row between">
+  <h1>Yedekler</h1>
+  <button class="btn sm" hx-get="/backups/list" hx-target="#backup-list">Yenile</button>
+</div>
+<div id="flash"></div>
+<div id="job-status" hx-get="/jobs/status" hx-trigger="load, every 2s, jobChanged from:body"></div>
+<div id="backup-list" hx-get="/backups/list" hx-trigger="load, backupsChanged from:body">
+  <div class="card"><p class="muted">FTP listesi alınıyor…</p></div>
+</div>
+{{end}}

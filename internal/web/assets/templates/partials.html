@@ -1,0 +1,132 @@
+{{define "flash"}}<div class="alert {{if .OK}}ok{{else}}err{{end}}" role="status">{{.Msg}}</div>{{end}}
+
+{{define "badge"}}<span class="badge {{statusClass .}}">{{statusText .}}</span>{{end}}
+
+{{define "jobStatus"}}
+{{if .Running}}
+<div class="card running">
+  <div class="row between">
+    <h2>Çalışan iş: {{kindText .S.Kind}} <a href="/history/{{.S.JobID}}">#{{.S.JobID}}</a></h2>
+    {{if .S.Cancelling}}<span class="badge warn">İptal ediliyor…</span>{{else}}
+    <button class="btn danger sm" hx-post="/jobs/cancel" hx-target="#flash" hx-confirm="Çalışan iş iptal edilsin mi?">İptal</button>{{end}}
+  </div>
+  <p class="muted">{{triggerText .S.Trigger}} · başladı {{ts .S.Started}}</p>
+  {{if .S.VMCount}}<p><b>VM {{.S.VMIndex}}/{{.S.VMCount}}</b>{{if .S.VMID}} — {{.S.VMID}}{{if .S.VMName}} ({{.S.VMName}}){{end}}{{end}}</p>{{end}}
+  <p>{{.S.Phase}}</p>
+  {{with .S.Transfer}}
+  <div class="progress"><div class="bar" style="width: {{pct .Percent}}%"></div></div>
+  <p class="muted small">{{pct .Percent}}% · {{bytes .Done}} / {{bytes .Total}} · {{speed .Speed}}</p>
+  {{end}}
+  {{if .Logs}}<pre class="log short">{{range .Logs}}<span class="lv-{{.Level}}">{{.Time.Format "15:04:05"}} {{.Msg}}</span>
+{{end}}</pre>{{end}}
+</div>
+{{else}}
+<div class="card"><p class="muted">Şu anda çalışan iş yok.</p></div>
+{{end}}
+{{end}}
+
+{{define "usage"}}
+{{if .Err}}<div class="alert err">{{.Err}}</div>
+{{else}}
+<p class="big">{{bytes .Total}}</p>
+<p class="muted">{{len .Groups}} VM · {{.Count}} yedek seti</p>
+{{if .Groups}}
+<div class="tbl"><table>
+<thead><tr><th>VM</th><th>Ad</th><th class="r">Set</th><th class="r">Boyut</th></tr></thead>
+<tbody>{{range .Groups}}<tr><td>{{.VMID}}</td><td>{{.Name}}</td><td class="r">{{len .Sets}}</td><td class="r">{{bytes .Size}}</td></tr>{{end}}</tbody>
+</table></div>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "dashboardGuests"}}
+{{if .Err}}<div class="alert err">VM listesi alınamadı: {{.Err}}</div>
+{{else if not .Guests}}<p class="muted">Bu node üzerinde VM/LXC yok.</p>
+{{else}}
+<div class="tbl"><table>
+<thead><tr><th>ID</th><th>Ad</th><th>Tür</th><th>Durum</th><th>Seçili</th><th></th></tr></thead>
+<tbody>
+{{range .Guests}}
+<tr>
+  <td>{{.VMID}}</td><td>{{.Name}}</td><td>{{typeText .Type}}</td>
+  <td><span class="badge {{if eq .Status "running"}}ok{{else}}muted{{end}}">{{.Status}}</span></td>
+  <td>{{if .Selected}}✔{{end}}</td>
+  <td class="r"><button class="btn sm" hx-post="/jobs/backup" hx-vals='{"vmid":"{{.VMID}}"}' hx-target="#flash" hx-confirm="VM {{.VMID}} şimdi yedeklensin mi?">Yedekle</button></td>
+</tr>
+{{end}}
+</tbody></table></div>
+{{end}}
+{{end}}
+
+{{define "settingsGuests"}}
+{{if .Err}}<div class="alert err">VM listesi alınamadı: {{.Err}}. Mevcut seçimler korunacak.</div>
+{{else if not .Guests}}<p class="muted">Bu node üzerinde VM/LXC yok.</p>
+{{else}}
+<input type="hidden" name="guestsLoaded" value="1">
+<div class="tbl"><table>
+<thead><tr><th>Dahil</th><th>ID</th><th>Ad</th><th>Tür</th><th>Durum</th><th>Disk</th><th>KEEP</th></tr></thead>
+<tbody>
+{{range .Guests}}
+<tr>
+  <td><input type="hidden" name="listed" value="{{.VMID}}"><input type="checkbox" name="vmid" value="{{.VMID}}" {{if .Selected}}checked{{end}} aria-label="VM {{.VMID}} dahil"></td>
+  <td>{{.VMID}}</td><td>{{.Name}}</td><td>{{typeText .Type}}</td>
+  <td><span class="badge {{if eq .Status "running"}}ok{{else}}muted{{end}}">{{.Status}}</span></td>
+  <td>{{bytes .MaxDisk}}</td>
+  <td><input class="keep" type="number" min="1" max="1000" name="keep_{{.VMID}}" value="{{if .Keep}}{{.Keep}}{{end}}" placeholder="{{$.DefaultKeep}}"></td>
+</tr>
+{{end}}
+</tbody></table></div>
+<p class="muted small">KEEP boş bırakılırsa varsayılan değer kullanılır.</p>
+{{end}}
+{{end}}
+
+{{define "cronPreview"}}
+{{if .Err}}<span class="text-err">{{.Err}}</span>
+{{else}}<b>{{.Desc}}</b> · Sonraki: {{range $i, $t := .Next}}{{if $i}}, {{end}}{{$t.Format "02.01.2006 15:04"}}{{end}}{{end}}
+{{end}}
+
+{{define "backupList"}}
+{{if .Err}}<div class="alert err">{{.Err}}</div>
+{{else}}
+<div class="card">
+  <div class="row between"><h2>Toplam kullanım</h2><span class="big">{{bytes .Total}}</span></div>
+  {{if .Groups}}<p class="muted">{{range $i, $g := .Groups}}{{if $i}} · {{end}}VM {{$g.VMID}}: {{bytes $g.Size}}{{end}}</p>{{end}}
+</div>
+{{if not .Groups}}<p class="muted">Uzak klasörde vzdump yedeği bulunamadı.</p>{{end}}
+{{range .Groups}}
+<details class="card group" open>
+  <summary><b>{{.VMID}}</b> {{if .Name}}{{.Name}}{{end}} <span class="muted">· {{typeText .Type}} · {{len .Sets}} set · {{bytes .Size}} · KEEP {{.Keep}}</span></summary>
+  <div class="tbl"><table>
+  <thead><tr><th>Dosya</th><th class="r">Boyut</th><th>Tarih</th><th class="r">İşlemler</th></tr></thead>
+  <tbody>
+  {{range .Sets}}{{range .Files}}
+  <tr>
+    <td class="mono">{{.Name}}</td>
+    <td class="r nowrap">{{bytes .Size}}</td>
+    <td class="nowrap">{{ts .Time}}</td>
+    <td class="r actions">
+      <a class="btn sm" href="/backups/download?name={{.Name}}" download>İndir</a>
+      {{if .IsArchive}}<button class="btn sm" hx-post="/backups/restore" hx-vals='{"name":"{{.Name}}"}' hx-target="#flash" hx-confirm="{{.Name}} Proxmox dump klasörüne indirilsin mi?">Proxmox'a geri al</button>{{end}}
+      <button class="btn sm danger" hx-post="/backups/delete" hx-vals='{"name":"{{.Name}}"}' hx-target="#flash" hx-confirm="{{.Name}} FTP'den kalıcı olarak silinsin mi? Bu işlem geri alınamaz.">Sil</button>
+    </td>
+  </tr>
+  {{end}}{{end}}
+  </tbody></table></div>
+</details>
+{{end}}
+{{if .Others}}
+<details class="card">
+  <summary>Biçime uymayan dosyalar ({{len .Others}}) <span class="muted">— bu dosyalara dokunulmaz</span></summary>
+  <ul class="plain">{{range .Others}}<li class="mono">{{.Name}} <span class="muted">({{bytes .Size}})</span></li>{{end}}</ul>
+</details>
+{{end}}
+{{end}}
+{{end}}
+
+{{define "jobLog"}}
+<div id="job-log" {{if eq .Job.Status "running"}}hx-get="/history/{{.Job.ID}}/log" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>
+  <div class="row between"><h2>Log</h2>{{template "badge" .Job.Status}}</div>
+  {{if .Logs}}<pre class="log">{{range .Logs}}<span class="lv-{{.Level}}">{{.Time.Format "02.01 15:04:05"}} {{.Msg}}</span>
+{{end}}</pre>{{else}}<p class="muted">Log kaydı yok.</p>{{end}}
+</div>
+{{end}}

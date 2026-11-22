@@ -1,0 +1,33 @@
+{{define "content"}}
+{{with .Data}}
+<h1>Geçmiş</h1>
+<p class="muted">Toplam {{.Total}} kayıt</p>
+<div class="card tbl">
+<table class="clickable">
+<thead><tr><th>#</th><th>Başlangıç</th><th>Süre</th><th>Tür</th><th>Tetikleme</th><th>Durum</th><th>VM sonuçları</th></tr></thead>
+<tbody>
+{{range .Jobs}}
+<tr>
+  <td><a href="/history/{{.ID}}">{{.ID}}</a></td>
+  <td class="nowrap"><a href="/history/{{.ID}}">{{ts .StartedAt}}</a></td>
+  <td class="nowrap">{{dur .Duration}}</td>
+  <td>{{kindText .Kind}}</td>
+  <td>{{triggerText .Trigger}}</td>
+  <td>{{template "badge" .Status}}</td>
+  <td>{{range .VMs}}<span class="badge {{statusClass .Status}}" title="{{statusText .Status}}{{if .Message}}: {{.Message}}{{end}}">{{.VMID}}</span> {{else}}<span class="muted small">{{.Summary}}</span>{{end}}</td>
+</tr>
+{{else}}
+<tr><td colspan="7" class="muted">Kayıt yok.</td></tr>
+{{end}}
+</tbody>
+</table>
+</div>
+{{if gt .Pages 1}}
+<div class="row gap pager">
+  {{if gt .Page 1}}<a class="btn sm" href="/history?page={{sub .Page 1}}">‹ Önceki</a>{{end}}
+  <span class="muted">Sayfa {{.Page}} / {{.Pages}}</span>
+  {{if lt .Page .Pages}}<a class="btn sm" href="/history?page={{add .Page 1}}">Sonraki ›</a>{{end}}
+</div>
+{{end}}
+{{end}}
+{{end}}

@@ -1,0 +1,19 @@
+[Unit]
+Description=Proxmox VE FTP Yedek Yöneticisi
+Documentation=https://github.com/atillakurtulussimsek/proxmox-ftp-backup-tool
+After=network-online.target pve-cluster.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/pve-ftp-backup serve
+Restart=on-failure
+RestartSec=5
+UMask=0077
+# Çalışan bir yedek iptal edilirken vzdump'ın temizlik yapabilmesi için süre tanı.
+TimeoutStopSec=240
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

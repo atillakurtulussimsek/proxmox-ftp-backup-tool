@@ -1,0 +1,113 @@
+{{define "content"}}
+{{with .Data}}
+<h1>Ayarlar</h1>
+
+<section class="card">
+  <h2>FTP sunucusu</h2>
+  <form hx-post="/settings/ftp" hx-target="#ftp-result">
+    <div class="form-grid">
+      <label>Protokol
+        <select name="protocol">
+          <option value="ftp" {{if eq .Cfg.FTP.Protocol "ftp"}}selected{{end}}>FTP</option>
+          <option value="ftps" {{if eq .Cfg.FTP.Protocol "ftps"}}selected{{end}}>FTPS (explicit TLS)</option>
+          <option value="sftp" {{if eq .Cfg.FTP.Protocol "sftp"}}selected{{end}}>SFTP</option>
+        </select>
+      </label>
+      <label>Sunucu <input name="host" value="{{.Cfg.FTP.Host}}" required autocomplete="off"></label>
+      <label>Port <input name="port" type="number" min="1" max="65535" value="{{.Cfg.FTP.Port}}" placeholder="21 / 22"></label>
+      <label>Kullanıcı adı <input name="username" value="{{.Cfg.FTP.Username}}" required autocomplete="off"></label>
+      <label>Şifre <input name="password" type="password" autocomplete="new-password" placeholder="{{if .HasPassword}}•••••• (kayıtlı — değiştirmek için yazın){{else}}Şifre{{end}}"></label>
+      <label>Uzak klasör <input name="remoteDir" value="{{.Cfg.FTP.RemoteDir}}" placeholder="/pve-yedek"></label>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" name="passive" {{if .Cfg.FTP.Passive}}checked{{end}}> Pasif mod <span class="muted small">(FTP/FTPS; aktif mod desteklenmiyor)</span></label>
+      <label><input type="checkbox" name="disableEpsv" {{if .Cfg.FTP.DisableEPSV}}checked{{end}}> EPSV'yi kapat, PASV kullan <span class="muted small">(NAT arkasındaki sunucular için)</span></label>
+      <label><input type="checkbox" name="tlsInsecure" {{if .Cfg.FTP.TLSInsecure}}checked{{end}}> FTPS sertifika doğrulamasını atla <span class="muted small">(kendinden imzalı sertifika)</span></label>
+      {{if .Cfg.FTP.HostKey}}<label><input type="checkbox" name="resetHostKey"> SFTP sunucu anahtarını sıfırla <span class="muted small mono">{{.Cfg.FTP.HostKey}}</span></label>{{end}}
+    </div>
+    <div class="row gap wrap">
+      <button class="btn primary" type="submit">Kaydet</button>
+      <button class="btn" type="button" hx-post="/settings/ftp/test" hx-include="closest form" hx-target="#ftp-result" hx-indicator="#ftp-spin">Bağlantıyı Test Et</button>
+      <span id="ftp-spin" class="htmx-indicator muted">Test ediliyor…</span>
+    </div>
+    <div id="ftp-result"></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Yedekleme ve saklama</h2>
+  <form hx-post="/settings/backup" hx-target="#backup-result">
+    <div class="form-grid">
+      <label>Mod
+        <select name="mode">
+          {{range $m := (list "snapshot" "suspend" "stop")}}<option value="{{$m}}" {{if eq $.Data.Cfg.Backup.Mode $m}}selected{{end}}>{{$m}}</option>{{end}}
+        </select>
+      </label>
+      <label>Sıkıştırma
+        <select name="compress">
+          {{range $c := (list "zstd" "gzip" "lzo")}}<option value="{{$c}}" {{if eq $.Data.Cfg.Backup.Compress $c}}selected{{end}}>{{$c}}</option>{{end}}
+        </select>
+      </label>
+      <label>Geçici yedek klasörü <input name="dumpDir" value="{{.Cfg.Backup.DumpDir}}" required></label>
+      <label>Varsayılan KEEP <input name="defaultKeep" type="number" min="1" max="1000" value="{{.Cfg.Backup.DefaultKeep}}" required></label>
+    </div>
+    <h3>VM / LXC seçimi</h3>
+    <div hx-get="/settings/guests" hx-trigger="load"><p class="muted">VM listesi alınıyor…</p></div>
+    <div class="row gap">
+      <button class="btn primary" type="submit">Kaydet</button>
+    </div>
+    <div id="backup-result"></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Zamanlama</h2>
+  <form hx-post="/settings/schedule" hx-target="#schedule-result">
+    <div class="checks"><label><input type="checkbox" name="enabled" {{if .Cfg.Schedule.Enabled}}checked{{end}}> Zamanlanmış yedekleme açık</label></div>
+    <div class="form-grid">
+      <label>Cron ifadesi <span class="muted small">(dakika saat gün ay haftanın-günü)</span>
+        <input name="cron" class="mono" value="{{.Cfg.Schedule.Cron}}" required
+          hx-get="/settings/cron-preview" hx-trigger="input changed delay:400ms" hx-target="#cron-preview">
+      </label>
+    </div>
+    <p id="cron-preview" class="small">{{if .CronErr}}<span class="text-err">{{.CronErr}}</span>{{else}}<b>{{.CronDesc}}</b> · Sonraki: {{range $i, $t := .NextRuns}}{{if $i}}, {{end}}{{$t.Format "02.01.2006 15:04"}}{{end}}{{end}}</p>
+    <p class="muted small">Örnekler: <code>0 2 * * *</code> her gün 02:00 · <code>30 1 * * 1-5</code> hafta içi 01:30 · <code>0 3 * * 0</code> her Pazar 03:00</p>
+    <button class="btn primary" type="submit">Kaydet</button>
+    <div id="schedule-result"></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Telegram bildirimi</h2>
+  <form hx-post="/settings/telegram" hx-target="#tg-result">
+    <div class="form-grid">
+      <label>Bot token <input name="token" type="password" autocomplete="off" placeholder="{{if .HasToken}}•••••• (kayıtlı — değiştirmek için yazın){{else}}123456:ABC...{{end}}"></label>
+      <label>Chat ID <input name="chatId" value="{{.Cfg.Telegram.ChatID}}" autocomplete="off"></label>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" name="onSuccess" {{if .Cfg.Telegram.OnSuccess}}checked{{end}}> Başarılı iş</label>
+      <label><input type="checkbox" name="onFailure" {{if .Cfg.Telegram.OnFailure}}checked{{end}}> Hatalı iş</label>
+      <label><input type="checkbox" name="onCleanup" {{if .Cfg.Telegram.OnCleanup}}checked{{end}}> Temizlik sonucu</label>
+      {{if .HasToken}}<label><input type="checkbox" name="clearToken"> Kayıtlı token'ı sil</label>{{end}}
+    </div>
+    <div class="row gap wrap">
+      <button class="btn primary" type="submit">Kaydet</button>
+      <button class="btn" type="button" hx-post="/settings/telegram/test" hx-include="closest form" hx-target="#tg-result">Test mesajı gönder</button>
+    </div>
+    <div id="tg-result"></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Genel</h2>
+  <form hx-post="/settings/general" hx-target="#general-result">
+    <div class="form-grid">
+      <label>Log ve geçmiş saklama süresi (gün) <input name="logRetentionDays" type="number" min="1" max="3650" value="{{.Cfg.LogRetentionDays}}" required></label>
+    </div>
+    <button class="btn primary" type="submit">Kaydet</button>
+    <div id="general-result"></div>
+  </form>
+  <p class="muted small">Dinleme adresi: <span class="mono">{{.Cfg.Listen}}</span>{{if .Cfg.TLSCert}} · HTTPS açık{{end}}. Bu değerler <span class="mono">/etc/pve-ftp-backup/config.json</span> dosyasından değiştirilir ve servis yeniden başlatılınca geçerli olur. Arayüz şifresi: <span class="mono">pve-ftp-backup set-password</span>.</p>
+</section>
+{{end}}
+{{end}}

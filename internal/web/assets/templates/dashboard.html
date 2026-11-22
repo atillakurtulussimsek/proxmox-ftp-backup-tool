@@ -1,0 +1,58 @@
+{{define "content"}}
+{{with .Data}}
+<h1>Kontrol Paneli</h1>
+<div id="flash"></div>
+
+<div id="job-status" hx-get="/jobs/status" hx-trigger="load, every 2s, jobChanged from:body">
+  <div class="card"><p class="muted">Durum yükleniyor…</p></div>
+</div>
+
+<div class="grid">
+  <section class="card">
+    <h2>Son iş</h2>
+    {{with .Last}}
+      <p><a href="/history/{{.ID}}">#{{.ID}} {{kindText .Kind}}</a> {{template "badge" .Status}}</p>
+      <p class="muted">{{triggerText .Trigger}} · {{ts .StartedAt}} · {{dur .Duration}}</p>
+      {{if .Summary}}<p>{{.Summary}}</p>{{end}}
+    {{else}}<p class="muted">Henüz iş çalışmadı.</p>{{end}}
+  </section>
+
+  <section class="card">
+    <h2>Zamanlama</h2>
+    {{if .ScheduleOn}}
+      <p><b>{{cronText .Cron}}</b> <span class="muted mono">({{.Cron}})</span></p>
+      <p>Sonraki çalışma: <b>{{ts .NextRun}}</b></p>
+    {{else}}<p class="muted">Zamanlanmış yedekleme kapalı.</p>{{end}}
+    <p class="muted">Seçili VM: {{.SelectedCount}}</p>
+  </section>
+
+  <section class="card">
+    <h2>Yerel geçici alan</h2>
+    <p class="mono">{{.DumpDir}}</p>
+    {{if .FreeErr}}<p class="text-err">{{.FreeErr}}</p>{{else}}<p class="big">{{bytes .FreeSpace}} boş</p>{{end}}
+  </section>
+</div>
+
+<section class="card">
+  <h2>İşlemler</h2>
+  {{if not .FTPConfigured}}<div class="alert err">FTP ayarları eksik. <a href="/settings">Ayarlar</a> sayfasından girin.</div>{{end}}
+  <div class="row wrap gap">
+    <button class="btn primary" hx-post="/jobs/backup" hx-target="#flash" hx-confirm="Seçili tüm VM'ler ({{.SelectedCount}}) şimdi yedeklensin mi?" {{if not .SelectedCount}}disabled{{end}}>Şimdi Yedekle (seçili tümü)</button>
+    <button class="btn" hx-post="/jobs/cleanup" hx-target="#flash" hx-confirm="Saklama temizliği şimdi çalıştırılsın mı? KEEP değerinden eski yedekler FTP'den silinecek.">Şimdi Temizle</button>
+  </div>
+</section>
+
+<div class="grid two">
+  <section class="card">
+    <h2>FTP kullanımı</h2>
+    {{if .FTPConfigured}}<p class="muted small mono">{{.FTPTarget}}</p>
+    <div hx-get="/dashboard/usage" hx-trigger="load"><p class="muted">Yükleniyor…</p></div>
+    {{else}}<p class="muted">FTP ayarlanmamış.</p>{{end}}
+  </section>
+  <section class="card">
+    <h2>Bu node'daki VM/LXC'ler</h2>
+    <div hx-get="/dashboard/guests" hx-trigger="load"><p class="muted">Yükleniyor…</p></div>
+  </section>
+</div>
+{{end}}
+{{end}}

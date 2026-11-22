@@ -1,0 +1,28 @@
+{{define "layout"}}<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"includeIndicatorStyles":false,"allowEval":false,"allowScriptTags":false}'>
+<title>{{.Title}} · PVE FTP Yedek</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body hx-headers='{"X-CSRF-Token":"{{.CSRF}}"}'>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="/">PVE FTP Yedek <small>{{.Node}}</small></a>
+    <nav>
+      <a href="/" {{if eq .Active "dashboard"}}class="on"{{end}}>Kontrol Paneli</a>
+      <a href="/backups" {{if eq .Active "backups"}}class="on"{{end}}>Yedekler</a>
+      <a href="/history" {{if or (eq .Active "history") (eq .Active "job")}}class="on"{{end}}>Geçmiş</a>
+      <a href="/settings" {{if eq .Active "settings"}}class="on"{{end}}>Ayarlar</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+{{template "content" .}}
+</main>
+<footer class="wrap foot">pve-ftp-backup {{.Version}}</footer>
+</body>
+</html>{{end}}

@@ -1,0 +1,32 @@
+{{define "content"}}
+{{with .Data}}{{with .Job}}
+<p><a href="/history">‹ Geçmiş</a></p>
+<h1>İş #{{.ID}} · {{kindText .Kind}}</h1>
+<div class="card">
+  <dl class="kv">
+    <dt>Durum</dt><dd>{{template "badge" .Status}}</dd>
+    <dt>Tetikleme</dt><dd>{{triggerText .Trigger}}</dd>
+    <dt>Başlangıç</dt><dd>{{ts .StartedAt}}</dd>
+    <dt>Bitiş</dt><dd>{{ts .FinishedAt}}</dd>
+    <dt>Süre</dt><dd>{{dur .Duration}}</dd>
+    {{if .BytesUploaded}}<dt>Yüklenen</dt><dd>{{bytes .BytesUploaded}}</dd>{{end}}
+    {{if .Summary}}<dt>Özet</dt><dd>{{.Summary}}</dd>{{end}}
+  </dl>
+</div>
+{{if .VMs}}
+<div class="card tbl">
+<h2>VM sonuçları</h2>
+<table>
+<thead><tr><th>VM</th><th>Ad</th><th>Durum</th><th class="r">Boyut</th><th>Süre</th><th>Mesaj</th></tr></thead>
+<tbody>
+{{range .VMs}}
+<tr><td>{{.VMID}}</td><td>{{.Name}}</td><td>{{template "badge" .Status}}</td><td class="r nowrap">{{if .Size}}{{bytes .Size}}{{end}}</td><td class="nowrap">{{dur .Duration}}</td><td>{{.Message}}</td></tr>
+{{end}}
+</tbody>
+</table>
+</div>
+{{end}}
+{{end}}
+<div class="card">{{template "jobLog" .}}</div>
+{{end}}
+{{end}}
