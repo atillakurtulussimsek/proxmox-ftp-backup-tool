@@ -109,5 +109,16 @@
   </form>
   <p class="muted small">Dinleme adresi: <span class="mono">{{.Cfg.Listen}}</span>{{if .Cfg.TLSCert}} · HTTPS açık{{end}}. Bu değerler <span class="mono">/etc/pve-ftp-backup/config.json</span> dosyasından değiştirilir ve servis yeniden başlatılınca geçerli olur. Arayüz şifresi: <span class="mono">pve-ftp-backup set-password</span>.</p>
 </section>
+
+<section class="card">
+  <h2>Güncelleme</h2>
+  <p>Kurulu sürüm: <span class="mono">{{$.Version}}</span></p>
+  <div class="row gap wrap">
+    <button class="btn" type="button" hx-post="/update/check" hx-target="#update-result" hx-indicator="#check-spin">Güncellemeleri kontrol et</button>
+    <span id="check-spin" class="htmx-indicator muted">Kontrol ediliyor…</span>
+  </div>
+  <div id="update-result"></div>
+  <p class="muted small">Sürümler GitHub Releases'tan alınır; indirilen binary SHA256SUMS ile doğrulanır. Çalışan bir iş varken güncelleme yapılamaz.</p>
+</section>
 {{end}}
 {{end}}

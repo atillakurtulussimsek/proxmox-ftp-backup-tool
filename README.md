@@ -46,7 +46,7 @@ make build
 make dist
 ```
 
-Paketi Proxmox host'una kopyalayın, açın ve root olarak kurun:
+Hazır paket her sürümde GitHub Releases sayfasında da bulunur. Paketi Proxmox host'una kopyalayın, açın ve root olarak kurun:
 
 ```bash
 tar xzf pve-ftp-backup-*-linux-amd64.tar.gz && cd pve-ftp-backup && ./install.sh
@@ -109,6 +109,36 @@ pve-ftp-backup set-password
 - **Geçmiş:** tüm işler; satıra tıklayınca VM sonuçları ve tam log açılır. Kayıtlar
   varsayılan olarak 90 gün saklanır (Ayarlar → Genel).
 
+## Güncelleme
+
+**Ayarlar → Güncelleme → Güncellemeleri kontrol et** GitHub'daki son kararlı sürümü
+gösterir. Yeniyse sürüm notlarıyla birlikte **Güncelle** butonu çıkar. Basınca:
+
+1. Yeni iş başlatılması engellenir (çalışan bir iş varsa güncelleme reddedilir).
+2. `pve-ftp-backup-linux-amd64` indirilir, release'teki `SHA256SUMS` ile doğrulanır ve
+   `version` komutuyla çalıştırılıp sürümü kontrol edilir.
+3. Binary atomik olarak değiştirilir ve servis `systemctl restart` ile yeniden başlatılır;
+   sayfa yeni sürüm açılınca kendini yeniler.
+
+Doğrulama başarısız olursa eski binary olduğu gibi kalır. Kontrol yalnızca elle yapılır.
+Güncelleme yalnızca binary'yi değiştirir; systemd unit dosyasındaki değişiklikler için
+`install.sh` tekrar çalıştırılmalıdır.
+
+### Sürüm yayımlama
+
+```bash
+git tag v0.2.0
+```
+
+```bash
+git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` testleri çalıştırır, derler ve şu dosyalarla GitHub Release
+oluşturur: `pve-ftp-backup-linux-amd64`, `pve-ftp-backup-<sürüm>-linux-amd64.tar.gz`,
+`SHA256SUMS`. Etiket `vMAJOR.MINOR.PATCH` biçiminde olmalıdır; `-` içeren etiketler
+(ör. `v0.2.0-rc1`) ön sürüm olarak yayımlanır ve güncelleyici tarafından görülmez.
+
 ## Geri yükleme
 
 1. **Yedekler** sayfasında ilgili arşivin (`.vma.zst`, `.tar.zst` vb.) yanındaki
@@ -165,6 +195,8 @@ internal/ftpclient     FTP / FTPS / SFTP ortak arayüzü, yol güvenliği
 internal/backup        vzdump, yükleme, doğrulama, saklama, geri alma, tek iş kilidi
 internal/scheduler     uygulama içi cron
 internal/notify        Telegram
+internal/updater       GitHub Releases'tan güncelleme
 internal/web           HTTP sunucusu, Basic Auth, CSRF, HTMX şablonları
 deploy/                systemd unit
+.github/workflows      etiket push'lanınca release oluşturma
 ```

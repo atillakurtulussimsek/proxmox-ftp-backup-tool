@@ -130,3 +130,27 @@
 {{end}}</pre>{{else}}<p class="muted">Log kaydı yok.</p>{{end}}
 </div>
 {{end}}
+
+{{define "updateResult"}}
+{{if .Newer}}
+<div class="alert ok" role="status">Yeni sürüm var: <strong>{{.Rel.Tag}}</strong> · {{ts .Rel.Published}} · <a href="{{.Rel.URL}}" target="_blank" rel="noopener">GitHub'da aç</a></div>
+{{if .Rel.Notes}}<pre class="notes">{{.Rel.Notes}}</pre>{{end}}
+{{if .Rel.Installable}}
+<form hx-post="/update/apply" hx-target="#update-result" hx-indicator="#update-spin" hx-disabled-elt="find button" hx-confirm="{{.Rel.Tag}} kurulsun ve servis yeniden başlatılsın mı?">
+  <input type="hidden" name="tag" value="{{.Rel.Tag}}">
+  <div class="row gap wrap">
+    <button class="btn primary" type="submit">{{.Rel.Tag}} sürümüne güncelle</button>
+    <span id="update-spin" class="htmx-indicator muted">İndiriliyor ve doğrulanıyor…</span>
+  </div>
+</form>
+{{else}}
+<div class="alert err" role="status">Bu release'te kurulum dosyaları (binary ve SHA256SUMS) yok.</div>
+{{end}}
+{{else}}
+<div class="alert ok" role="status">Güncelsiniz. Son sürüm: <strong>{{.Rel.Tag}}</strong></div>
+{{end}}
+{{end}}
+
+{{define "updateRestarting"}}
+<div class="alert ok" role="status" hx-get="/update/wait?tag={{.}}" hx-trigger="every 2s" hx-swap="none">{{.}} kuruldu. Servis yeniden başlatılıyor; sayfa birazdan yenilenecek…</div>
+{{end}}

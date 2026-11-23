@@ -85,6 +85,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /settings/telegram/test", s.handleTestTelegram)
 	mux.HandleFunc("POST /settings/general", s.handleSaveGeneral)
 
+	mux.HandleFunc("POST /update/check", s.handleUpdateCheck)
+	mux.HandleFunc("POST /update/apply", s.handleUpdateApply)
+	mux.HandleFunc("GET /update/wait", s.handleUpdateWait)
+
 	mux.HandleFunc("POST /jobs/backup", s.handleRunBackup)
 	mux.HandleFunc("POST /jobs/cleanup", s.handleRunCleanup)
 	mux.HandleFunc("POST /jobs/cancel", s.handleCancel)

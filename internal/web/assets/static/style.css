@@ -148,3 +148,4 @@ ul.plain { padding-left: 1rem; }
   .top-in { padding-top: .4rem; padding-bottom: .4rem; }
   td.actions .btn { margin: .15rem 0 .15rem .2rem; }
 }
+.notes { white-space: pre-wrap; max-height: 16rem; overflow: auto; background: var(--bg); padding: .6rem .8rem; border-radius: var(--radius); font-size: .85rem; }

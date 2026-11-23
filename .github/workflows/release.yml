@@ -1,0 +1,43 @@
+# v* etiketi push'lanınca test eder, derler ve GitHub Release oluşturur.
+# Uygulama içi güncelleyici bu release'teki dosyaları kullanır:
+#   pve-ftp-backup-linux-amd64   tek binary
+#   SHA256SUMS                   sha256 özetleri
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: make vet test
+
+      - name: Derle ve paketle
+        run: make dist VERSION="${GITHUB_REF_NAME}"
+
+      - name: Release dosyalarını hazırla
+        run: |
+          mkdir -p release
+          cp build/pve-ftp-backup release/pve-ftp-backup-linux-amd64
+          cp build/pve-ftp-backup-"${GITHUB_REF_NAME}"-linux-amd64.tar.gz release/
+          cd release && sha256sum * > SHA256SUMS && cat SHA256SUMS
+
+      - name: Release oluştur
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          [[ "${GITHUB_REF_NAME}" == *-* ]] && pre="--prerelease"
+          gh release create "${GITHUB_REF_NAME}" release/* --title "${GITHUB_REF_NAME}" --generate-notes $pre

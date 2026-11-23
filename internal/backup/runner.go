@@ -22,6 +22,9 @@ import (
 // ErrBusy, başka bir iş çalışırken döndürülür.
 var ErrBusy = errors.New("başka bir iş çalışıyor; bitmesini bekleyin veya iptal edin")
 
+// ErrUpdating, uygulama güncellenirken yeni iş başlatılmak istendiğinde döndürülür.
+var ErrUpdating = errors.New("uygulama güncelleniyor; yeni iş başlatılamaz")
+
 // UPLOAD_PREFIX, yükleme sürerken kullanılan geçici uzak ad önekidir. Bu önekli dosyalar
 // vzdump biçimine uymadığı için saklama temizliğine hiçbir zaman dahil olmaz.
 const UPLOAD_PREFIX = "uploading-"
@@ -71,10 +74,11 @@ type Runner struct {
 	log     *slog.Logger
 	baseCtx context.Context
 
-	mu     sync.Mutex
-	cur    *Status
-	cancel context.CancelFunc
-	done   chan struct{}
+	mu       sync.Mutex
+	cur      *Status
+	updating bool
+	cancel   context.CancelFunc
+	done     chan struct{}
 }
 
 func NewRunner(baseCtx context.Context, cfg *config.Manager, st *store.Store, log *slog.Logger) *Runner {
@@ -165,6 +169,9 @@ func (r *Runner) setPhase(phase string) {
 func (r *Runner) begin(kind, trigger string) (*job, context.Context, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.updating {
+		return nil, nil, ErrUpdating
+	}
 	if r.cur != nil {
 		return nil, nil, ErrBusy
 	}
@@ -191,10 +198,32 @@ func (r *Runner) end() {
 	r.done = nil
 }
 
+// HoldForUpdate, iş çalışmıyorsa yeni işlerin başlamasını engeller. Dönen fonksiyon
+// engeli kaldırır (güncelleme başarısız olursa çağrılır).
+func (r *Runner) HoldForUpdate() (func(), error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.cur != nil {
+		return nil, ErrBusy
+	}
+	if r.updating {
+		return nil, ErrUpdating
+	}
+	r.updating = true
+	return func() {
+		r.mu.Lock()
+		r.updating = false
+		r.mu.Unlock()
+	}, nil
+}
+
 // rejectIfBusy, kilit alınamadığında reddi geçmişe yazar.
 func (r *Runner) rejectIfBusy(err error, kind, trigger string) {
-	if errors.Is(err, ErrBusy) {
+	switch {
+	case errors.Is(err, ErrBusy):
 		_ = r.st.RecordRejected(kind, trigger, "Başka bir iş çalıştığı için reddedildi.")
+	case errors.Is(err, ErrUpdating):
+		_ = r.st.RecordRejected(kind, trigger, "Uygulama güncellendiği için reddedildi.")
 	}
 }
 
