@@ -53,12 +53,15 @@ func (s *Server) loadRemote(ctx context.Context) ([]groupView, []ftpclient.FileI
 		return nil, nil, 0, err
 	}
 	defer client.Close()
-	list, err := client.List(ctx)
+	list, others, err := backup.ListRemote(ctx, client)
 	if err != nil {
 		return nil, nil, 0, err
 	}
 	var total int64
 	for _, f := range list {
+		total += f.Size
+	}
+	for _, f := range others {
 		total += f.Size
 	}
 	names := map[int]string{}
@@ -67,7 +70,7 @@ func (s *Server) loadRemote(ctx context.Context) ([]groupView, []ftpclient.FileI
 			names[g.VMID] = g.Name
 		}
 	}
-	groups, others := backup.Group(list)
+	groups, _ := backup.Group(list)
 	out := make([]groupView, 0, len(groups))
 	for _, g := range groups {
 		gv := groupView{VMID: g.VMID, Type: g.Type, Name: names[g.VMID], Size: g.Size, Keep: cfg.KeepFor(g.VMID)}
@@ -108,17 +111,17 @@ func (s *Server) handleBackupList(w http.ResponseWriter, r *http.Request) {
 	s.fragment(w, "backupList", d)
 }
 
-// validBackupName, yalnızca vzdump biçimindeki ve güvenli dosya adlarını kabul eder.
-func validBackupName(name string) (backup.BackupFile, bool) {
-	if ftpclient.ValidateName(name) != nil {
-		return backup.BackupFile{}, false
-	}
-	return backup.ParseName(name)
+// remotePathFor, yalnızca vzdump biçimindeki güvenli dosya adlarını kabul eder ve
+// dosyanın uzak sunucudaki köke göre göreli yolunu döndürür.
+func remotePathFor(name string) (string, bool) {
+	rp, err := backup.RemotePath(name)
+	return rp, err == nil
 }
 
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
-	if _, ok := validBackupName(name); !ok {
+	rp, ok := remotePathFor(name)
+	if !ok {
 		http.Error(w, "Geçersiz dosya adı", http.StatusBadRequest)
 		return
 	}
@@ -128,7 +131,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer client.Close()
-	size, err := client.Size(r.Context(), name)
+	size, err := client.Size(r.Context(), rp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -138,14 +141,15 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Disposition", `attachment; filename="`+name+`"`)
 	h.Set("Content-Length", strconv.FormatInt(size, 10))
 	h.Set("Cache-Control", "no-store")
-	if err := client.Download(r.Context(), name, w, nil); err != nil {
+	if err := client.Download(r.Context(), rp, w, nil); err != nil {
 		s.log.Warn("indirme yarıda kaldı", "name", name, "err", err)
 	}
 }
 
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	name := r.PostFormValue("name")
-	if _, ok := validBackupName(name); !ok {
+	rp, ok := remotePathFor(name)
+	if !ok {
 		s.flash(w, false, "Geçersiz dosya adı")
 		return
 	}
@@ -154,20 +158,20 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		s.flash(w, false, "FTP bağlantısı kurulamadı: %v", err)
 		return
 	}
-	err = client.Delete(r.Context(), name)
+	err = client.Delete(r.Context(), rp)
 	client.Close()
 	if err != nil {
 		s.flash(w, false, "%s silinemedi: %v", name, err)
 		return
 	}
-	s.log.Info("uzak yedek silindi", "name", name, "remote", r.RemoteAddr)
+	s.log.Info("uzak yedek silindi", "path", rp, "remote", r.RemoteAddr)
 	w.Header().Set("HX-Trigger", "backupsChanged")
 	s.flash(w, true, "%s silindi.", name)
 }
 
 func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 	name := r.PostFormValue("name")
-	if _, ok := validBackupName(name); !ok {
+	if _, ok := remotePathFor(name); !ok {
 		s.flash(w, false, "Geçersiz dosya adı")
 		return
 	}

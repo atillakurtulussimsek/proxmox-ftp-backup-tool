@@ -158,3 +158,23 @@ func TestPlanRetention(t *testing.T) {
 		}
 	}
 }
+
+func TestRemotePath(t *testing.T) {
+	cases := map[string]string{
+		"vzdump-qemu-101-2026_11_23-02_00_00.vma.zst":   "backup/101/vzdump-qemu-101-2026_11_23-02_00_00.vma.zst",
+		"vzdump-qemu-101-2026_11_23-02_00_00.log":       "logs/101/vzdump-qemu-101-2026_11_23-02_00_00.log",
+		"vzdump-lxc-7-2026_11_23-02_00_00.tar.gz":       "backup/7/vzdump-lxc-7-2026_11_23-02_00_00.tar.gz",
+		"vzdump-qemu-101-2026_11_23-02_00_00.vma.notes": "backup/101/vzdump-qemu-101-2026_11_23-02_00_00.vma.notes",
+	}
+	for in, want := range cases {
+		got, err := RemotePath(in)
+		if err != nil || got != want {
+			t.Errorf("RemotePath(%q) = %q, %v; beklenen %q", in, got, err, want)
+		}
+	}
+	for _, bad := range []string{"random.txt", "../vzdump-qemu-101-2026_11_23-02_00_00.log", "uploading-vzdump-qemu-101-2026_11_23-02_00_00.log"} {
+		if _, err := RemotePath(bad); err == nil {
+			t.Errorf("RemotePath(%q) hata bekleniyordu", bad)
+		}
+	}
+}

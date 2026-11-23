@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -504,9 +505,18 @@ func (r *Runner) backupOne(ctx context.Context, j *job, cfg config.Config, vmid 
 	return res
 }
 
-// uploadVerified, dosyayı geçici adla yükler, boyutunu doğrular ve asıl adına taşır.
+// uploadVerified, dosyayı hedef klasörüne (backup/<vmid> veya logs/<vmid>) geçici adla
+// yükler, boyutunu doğrular ve asıl adına taşır.
 func (r *Runner) uploadVerified(ctx context.Context, j *job, c ftpclient.Client, local, name string, size int64) (int64, error) {
-	tmp := UPLOAD_PREFIX + name
+	dst, err := RemotePath(name)
+	if err != nil {
+		return 0, err
+	}
+	dir := path.Dir(dst)
+	if err := c.EnsureDir(ctx, dir); err != nil {
+		return 0, err
+	}
+	tmp := path.Join(dir, UPLOAD_PREFIX+name)
 	r.update(func(s *Status) {
 		s.Phase = "Yükleniyor: " + name
 		s.Transfer = &Transfer{Name: name, Total: size, Started: time.Now()}
@@ -534,16 +544,16 @@ func (r *Runner) uploadVerified(ctx context.Context, j *job, c ftpclient.Client,
 		_ = c.Delete(context.Background(), tmp)
 		return 0, fmt.Errorf("boyut uyuşmuyor: yerel %d, uzak %d bayt", size, remote)
 	}
-	if err := c.Rename(ctx, tmp, name); err != nil {
+	if err := c.Rename(ctx, tmp, dst); err != nil {
 		_ = c.Delete(context.Background(), tmp)
 		return 0, err
 	}
-	if remote, err = c.Size(ctx, name); err != nil || remote != size {
+	if remote, err = c.Size(ctx, dst); err != nil || remote != size {
 		return 0, fmt.Errorf("taşıma sonrası doğrulama başarısız (uzak %d bayt): %v", remote, err)
 	}
 	el := time.Since(t0)
 	speed := float64(size) / max(el.Seconds(), 0.001)
-	j.info("Yüklendi ve doğrulandı: %s, %s, ortalama %s/sn", name, HumanDuration(el), HumanBytes(int64(speed)))
+	j.info("Yüklendi ve doğrulandı: %s, %s, ortalama %s/sn", dst, HumanDuration(el), HumanBytes(int64(speed)))
 	return size, nil
 }
 
@@ -594,16 +604,19 @@ func (r *Runner) retention(ctx context.Context, j *job, cfg config.Config, skip 
 		return res, err
 	}
 	defer client.Close()
-	list, err := client.List(ctx)
+	list, others, err := ListRemote(ctx, client)
 	if err != nil {
 		return res, err
 	}
 	for _, f := range list {
 		res.TotalUsed += f.Size
 	}
-	groups, others := Group(list)
+	for _, f := range others {
+		res.TotalUsed += f.Size
+	}
+	groups, _ := Group(list)
 	if len(others) > 0 {
-		j.info("Biçime uymayan %d dosyaya dokunulmadı", len(others))
+		j.info("Klasör düzenine uymayan %d dosyaya dokunulmadı", len(others))
 	}
 	del := PlanRetention(groups, cfg.KeepFor, skip)
 	if len(del) == 0 {
@@ -614,7 +627,11 @@ func (r *Runner) retention(ctx context.Context, j *job, cfg config.Config, skip 
 		if err := ctx.Err(); err != nil {
 			return res, err
 		}
-		if err := client.Delete(ctx, f.Name); err != nil {
+		rp, err := RemotePath(f.Name)
+		if err == nil {
+			err = client.Delete(ctx, rp)
+		}
+		if err != nil {
 			res.Failed++
 			j.error("Silinemedi: %s: %v", f.Name, err)
 			continue
@@ -669,14 +686,18 @@ func (r *Runner) StartRestore(name string) (int64, error) {
 }
 
 func (r *Runner) restore(ctx context.Context, j *job, cfg config.Config, name, dest string) (int64, error) {
-	j.info("Geri alma: %s → %s", name, dest)
+	rp, err := RemotePath(name)
+	if err != nil {
+		return 0, err
+	}
+	j.info("Geri alma: %s → %s", rp, dest)
 	r.setPhase("FTP'ye bağlanılıyor")
 	client, err := Connect(ctx, r.cfg)
 	if err != nil {
 		return 0, err
 	}
 	defer client.Close()
-	size, err := client.Size(ctx, name)
+	size, err := client.Size(ctx, rp)
 	if err != nil {
 		return 0, err
 	}
@@ -699,7 +720,7 @@ func (r *Runner) restore(ctx context.Context, j *job, cfg config.Config, name, d
 		s.Phase = "İndiriliyor: " + name
 		s.Transfer = &Transfer{Name: name, Total: size, Started: time.Now()}
 	})
-	err = client.Download(ctx, name, f, func(n int64) {
+	err = client.Download(ctx, rp, f, func(n int64) {
 		r.update(func(s *Status) {
 			if s.Transfer != nil {
 				s.Transfer.Done = n

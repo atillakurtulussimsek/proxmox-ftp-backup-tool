@@ -134,7 +134,7 @@
 {{end}}
 {{if .Others}}
 <details class="card">
-  <summary>Biçime uymayan dosyalar ({{len .Others}}) <span class="muted">— bu dosyalara dokunulmaz</span></summary>
+  <summary>Klasör düzenine uymayan dosyalar ({{len .Others}}) <span class="muted">— bu dosyalara dokunulmaz</span></summary>
   <ul class="plain">{{range .Others}}<li class="mono">{{.Name}} <span class="muted">({{bytes .Size}})</span></li>{{end}}</ul>
 </details>
 {{end}}

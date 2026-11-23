@@ -75,17 +75,33 @@ func (c *sftpClient) EnsureRoot(ctx context.Context) error {
 	return nil
 }
 
-func (c *sftpClient) List(ctx context.Context) ([]FileInfo, error) {
-	entries, err := c.sftp.ReadDir(c.root)
+func (c *sftpClient) EnsureDir(ctx context.Context, dir string) error {
+	full, err := SafeJoin(c.root, dir)
 	if err != nil {
-		return nil, fmt.Errorf("uzak klasör listelenemedi: %w", err)
+		return err
+	}
+	if err := c.sftp.MkdirAll(full); err != nil {
+		return fmt.Errorf("uzak klasör oluşturulamadı (%s): %w", full, err)
+	}
+	return nil
+}
+
+func (c *sftpClient) List(ctx context.Context, dir string) ([]FileInfo, error) {
+	full, err := SafeJoin(c.root, dir)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := c.sftp.ReadDir(full)
+	if err != nil {
+		return nil, fmt.Errorf("uzak klasör listelenemedi (%s): %w", full, err)
 	}
 	out := make([]FileInfo, 0, len(entries))
 	for _, e := range entries {
-		if !e.Mode().IsRegular() || ValidateName(e.Name()) != nil {
+		isDir := e.IsDir()
+		if (!e.Mode().IsRegular() && !isDir) || ValidateName(e.Name()) != nil {
 			continue
 		}
-		out = append(out, FileInfo{Name: e.Name(), Size: e.Size(), ModTime: e.ModTime()})
+		out = append(out, FileInfo{Name: e.Name(), Size: e.Size(), ModTime: e.ModTime(), IsDir: isDir})
 	}
 	return out, nil
 }

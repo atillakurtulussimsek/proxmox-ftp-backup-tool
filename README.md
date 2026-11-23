@@ -16,16 +16,27 @@ Yerel disk az olduğu için VM'ler **tek tek ve sırayla** işlenir:
 1. Geçici klasörde (varsayılan `/var/lib/vz/dump`) VM'in disk boyutu (`maxdisk`) kadar boş
    alan var mı kontrol edilir. Yoksa yalnızca o VM atlanır.
 2. `vzdump <vmid> --dumpdir <klasör> --mode .. --compress .. --remove 0` çalışır.
-3. Oluşan arşiv ve log dosyası `uploading-<ad>` geçici adıyla FTP'ye yüklenir, uzak boyut
-   yerel boyutla karşılaştırılır, ardından asıl adına taşınır.
+3. Oluşan arşiv ve log dosyası kendi klasörüne `uploading-<ad>` geçici adıyla yüklenir, uzak
+   boyut yerel boyutla karşılaştırılır, ardından asıl adına taşınır.
 4. Doğrulama başarılıysa yerel dosyalar silinir. Başarısızsa yerel dosyalar **korunur** ve VM
    hatalı işaretlenir.
 5. Sonraki VM'e geçilir.
 
-Tüm VM'ler bitince **saklama temizliği** çalışır: uzak klasördeki
+Uzak sunucudaki klasör düzeni (`<uzak klasör>` ayarlarda girilen klasördür):
+
+```
+<uzak klasör>/backup/<vmid>/vzdump-qemu-101-2026_11_23-02_00_00.vma.zst
+<uzak klasör>/logs/<vmid>/vzdump-qemu-101-2026_11_23-02_00_00.log
+```
+
+`.log` dosyaları `logs/` altına, arşiv ve diğer vzdump dosyaları (ör. `.notes`) `backup/`
+altına gider; klasörler gerektiğinde otomatik oluşturulur.
+
+Tüm VM'ler bitince **saklama temizliği** çalışır: `backup/<vmid>` ve `logs/<vmid>` altındaki
 `vzdump-(qemu|lxc)-<vmid>-<YYYY_MM_DD-HH_MM_SS>.*` dosyaları VM ve zaman damgasına göre
-gruplanır; her VM için en yeni KEEP adet zaman damgası tutulur, daha eskilerin tüm dosyaları
-silinir. Bu biçime uymayan dosyalara dokunulmaz. Bu çalışmada yedeği başarısız olan ya da
+gruplanır; her VM için en yeni KEEP adet zaman damgası tutulur, daha eskilerin arşiv ve log
+dosyaları birlikte silinir. Bu düzene uymayan dosyalara (kökteki dosyalar, yanlış klasördeki
+ya da biçime uymayan dosyalar) dokunulmaz. Bu çalışmada yedeği başarısız olan ya da
 atlanan VM'lerin eski yedekleri o işte temizlenmez.
 
 Aynı anda yalnızca bir iş çalışır; iş sürerken tetiklenen yeni iş reddedilir ve geçmişe

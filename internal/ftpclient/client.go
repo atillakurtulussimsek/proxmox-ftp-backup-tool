@@ -1,6 +1,6 @@
 // Package ftpclient, FTP, FTPS (explicit) ve SFTP için ortak bir istemci arayüzü sağlar.
-// Tüm dosya işlemleri ayarlardaki uzak kök klasöre göredir ve yalnızca bu klasördeki
-// düz dosya adlarını kabul eder.
+// Tüm dosya işlemleri ayarlardaki uzak kök klasöre göredir. Yollar köke göre görelidir
+// ("backup/101/dosya" gibi); her parça ayrı doğrulanır, kökün dışına çıkılamaz.
 package ftpclient
 
 import (
@@ -19,6 +19,7 @@ type FileInfo struct {
 	Name    string
 	Size    int64
 	ModTime time.Time
+	IsDir   bool
 }
 
 // ProgressFunc, o ana kadar aktarılan toplam bayt sayısıyla çağrılır.
@@ -28,13 +29,15 @@ type ProgressFunc func(transferred int64)
 type Client interface {
 	// EnsureRoot, uzak kök klasörü yoksa oluşturur.
 	EnsureRoot(ctx context.Context) error
-	// List, uzak kök klasördeki dosyaları listeler (klasörler hariç).
-	List(ctx context.Context) ([]FileInfo, error)
+	// EnsureDir, köke göre göreli klasörü (ara klasörlerle birlikte) yoksa oluşturur.
+	EnsureDir(ctx context.Context, dir string) error
+	// List, köke göre göreli klasördeki dosya ve klasörleri listeler; "" kökün kendisidir.
+	List(ctx context.Context, dir string) ([]FileInfo, error)
 	Upload(ctx context.Context, localPath, name string, progress ProgressFunc) error
 	Download(ctx context.Context, name string, w io.Writer, progress ProgressFunc) error
 	Size(ctx context.Context, name string) (int64, error)
 	Delete(ctx context.Context, name string) error
-	// Rename, kök klasördeki bir dosyanın adını değiştirir (hedef varsa üzerine yazar).
+	// Rename, bir dosyayı taşır/yeniden adlandırır (hedef varsa üzerine yazar).
 	Rename(ctx context.Context, from, to string) error
 	Close() error
 }
@@ -51,17 +54,27 @@ func ValidateName(name string) error {
 	return nil
 }
 
-// SafeJoin, adı kök klasörle birleştirir; sonuç kökün dışına çıkıyorsa hata döndürür.
-func SafeJoin(root, name string) (string, error) {
-	if err := ValidateName(name); err != nil {
-		return "", err
-	}
+// MAX_DEPTH, köke göre göreli yolun en fazla kaç parçadan oluşabileceğidir.
+const MAX_DEPTH = 4
+
+// SafeJoin, köke göre göreli yolu kökle birleştirir. Yol "/" ile ayrılmış parçalardan
+// oluşur; her parça ValidateName'den geçmelidir. "" kökün kendisini verir.
+func SafeJoin(root, rel string) (string, error) {
 	cleanRoot := CleanRoot(root)
-	full := path.Join(cleanRoot, name)
-	if path.Dir(full) != cleanRoot {
-		return "", fmt.Errorf("%w: %q", ErrInvalidName, name)
+	if rel == "" {
+		return cleanRoot, nil
 	}
-	return full, nil
+	parts := strings.Split(rel, "/")
+	if len(parts) > MAX_DEPTH {
+		return "", fmt.Errorf("%w: %q", ErrInvalidName, rel)
+	}
+	for _, p := range parts {
+		if err := ValidateName(p); err != nil {
+			return "", fmt.Errorf("%w: %q", ErrInvalidName, rel)
+		}
+	}
+	// Hiçbir parça "/", "." veya ".." olamadığı için birleşim kökün dışına çıkamaz.
+	return path.Join(cleanRoot, rel), nil
 }
 
 // CleanRoot, uzak kök klasörü normalize eder.

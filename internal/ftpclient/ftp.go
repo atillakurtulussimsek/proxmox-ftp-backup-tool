@@ -52,17 +52,30 @@ func dialFTP(ctx context.Context, cfg config.FTPConfig) (*ftpClient, error) {
 }
 
 func (c *ftpClient) EnsureRoot(ctx context.Context) error {
-	if c.root == "/" || c.root == "." {
+	return c.mkdirAll(ctx, c.root)
+}
+
+func (c *ftpClient) EnsureDir(ctx context.Context, dir string) error {
+	full, err := SafeJoin(c.root, dir)
+	if err != nil {
+		return err
+	}
+	return c.mkdirAll(ctx, full)
+}
+
+// mkdirAll, mutlak ya da göreli bir klasörü ara klasörleriyle birlikte oluşturur.
+func (c *ftpClient) mkdirAll(ctx context.Context, dir string) error {
+	if dir == "/" || dir == "." {
 		return nil
 	}
-	if err := c.conn.ChangeDir(c.root); err == nil {
+	if err := c.conn.ChangeDir(dir); err == nil {
 		return nil
 	}
 	cur := ""
-	if strings.HasPrefix(c.root, "/") {
+	if strings.HasPrefix(dir, "/") {
 		cur = "/"
 	}
-	for _, part := range strings.Split(strings.Trim(c.root, "/"), "/") {
+	for _, part := range strings.Split(strings.Trim(dir, "/"), "/") {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -74,27 +87,32 @@ func (c *ftpClient) EnsureRoot(ctx context.Context) error {
 			return fmt.Errorf("uzak klasör oluşturulamadı (%s): %w", cur, err)
 		}
 	}
-	if err := c.conn.ChangeDir(c.root); err != nil {
+	if err := c.conn.ChangeDir(dir); err != nil {
 		return fmt.Errorf("uzak klasöre geçilemedi: %w", err)
 	}
 	return nil
 }
 
-func (c *ftpClient) List(ctx context.Context) ([]FileInfo, error) {
-	entries, err := c.conn.List(c.root)
+func (c *ftpClient) List(ctx context.Context, dir string) ([]FileInfo, error) {
+	full, err := SafeJoin(c.root, dir)
 	if err != nil {
-		return nil, fmt.Errorf("uzak klasör listelenemedi: %w", err)
+		return nil, err
+	}
+	entries, err := c.conn.List(full)
+	if err != nil {
+		return nil, fmt.Errorf("uzak klasör listelenemedi (%s): %w", full, err)
 	}
 	out := make([]FileInfo, 0, len(entries))
 	for _, e := range entries {
-		if e.Type != ftp.EntryTypeFile {
+		isDir := e.Type == ftp.EntryTypeFolder
+		if e.Type != ftp.EntryTypeFile && !isDir {
 			continue
 		}
 		name := path.Base(e.Name)
 		if ValidateName(name) != nil {
 			continue
 		}
-		out = append(out, FileInfo{Name: name, Size: int64(e.Size), ModTime: e.Time})
+		out = append(out, FileInfo{Name: name, Size: int64(e.Size), ModTime: e.Time, IsDir: isDir})
 	}
 	return out, nil
 }
@@ -145,12 +163,13 @@ func (c *ftpClient) Size(ctx context.Context, name string) (int64, error) {
 		return n, nil
 	}
 	// SIZE desteklemeyen sunucular için listeden bak.
-	files, lerr := c.List(ctx)
+	dir, base := path.Split(name)
+	files, lerr := c.List(ctx, strings.TrimSuffix(dir, "/"))
 	if lerr != nil {
 		return 0, fmt.Errorf("uzak dosya boyutu alınamadı: %w", err)
 	}
 	for _, f := range files {
-		if f.Name == name {
+		if !f.IsDir && f.Name == base {
 			return f.Size, nil
 		}
 	}
