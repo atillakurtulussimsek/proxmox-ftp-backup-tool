@@ -22,7 +22,7 @@
     <p class="job-phase">{{.S.Phase}}</p>
     {{with .S.Transfer}}
     <div class="progress"><span style="width: {{pct .Percent}}%"></span></div>
-    <p class="stat-sub num">%{{pct .Percent}} · {{bytes .Done}} / {{bytes .Total}} · {{speed .Speed}}</p>
+    <p class="stat-sub num">%{{pct .Percent}} · {{bytes .Done}} / {{bytes .Total}} · {{speed .Speed}} ({{mbit .Speed}}){{if .Limit}} · sınır {{mbit .Limit}}{{end}}</p>
     {{end}}
   </div>
   <pre class="log job-log">{{range .Logs}}<span class="lv-{{.Level}}">{{.Time.Format "15:04:05"}} {{.Msg}}</span>

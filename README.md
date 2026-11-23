@@ -88,9 +88,12 @@ Arayüz: `http://<proxmox-ip>:8090`
    klasör ve varsayılan KEEP değerini (7) belirleyin. VM bazında farklı KEEP girilebilir.
 3. **Zamanlama:** cron ifadesi girin (ör. `0 2 * * *` her gün 02:00) ve açın. Yazarken
    okunabilir açıklama ve sonraki çalışma zamanları gösterilir.
-4. **Telegram (isteğe bağlı):** bot token ve chat ID girin, hangi bildirimlerin gönderileceğini
+4. **Hız sınırı (isteğe bağlı):** FTP'ye yükleme ve FTP'den indirme (Proxmox'a geri alma,
+   tarayıcıya indirme) için ayrı ayrı Mbit/sn sınırı girin; boş bırakılırsa sınırsızdır.
+   Değişiklik süren aktarımlara da birkaç saniye içinde uygulanır.
+5. **Telegram (isteğe bağlı):** bot token ve chat ID girin, hangi bildirimlerin gönderileceğini
    seçin, "Test mesajı gönder" ile deneyin.
-5. **Kontrol Paneli → Şimdi Yedekle** ile ilk yedeği elle alıp sonucu izleyin.
+6. **Kontrol Paneli → Şimdi Yedekle** ile ilk yedeği elle alıp sonucu izleyin.
 
 ### Ayar dosyasından değiştirilenler
 

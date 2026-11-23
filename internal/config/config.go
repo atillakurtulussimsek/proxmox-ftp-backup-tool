@@ -83,7 +83,22 @@ type Config struct {
 	Backup           BackupConfig   `json:"backup"`
 	Schedule         ScheduleConfig `json:"schedule"`
 	Telegram         TelegramConfig `json:"telegram"`
+	Bandwidth        BandwidthLimit `json:"bandwidth"`
 	LogRetentionDays int            `json:"logRetentionDays"`
+}
+
+// BandwidthLimit, aktarım hız sınırlarıdır (Mbit/sn); 0 sınırsız demektir.
+type BandwidthLimit struct {
+	UploadMbit   int `json:"uploadMbit"`
+	DownloadMbit int `json:"downloadMbit"`
+}
+
+// BytesPerSec, Mbit/sn değerini bayt/sn'ye çevirir; 0 veya negatif sınırsızdır.
+func BytesPerSec(mbit int) int64 {
+	if mbit <= 0 {
+		return 0
+	}
+	return int64(mbit) * 1_000_000 / 8
 }
 
 // Default, varsayılan ayarlarla yeni bir Config döndürür.

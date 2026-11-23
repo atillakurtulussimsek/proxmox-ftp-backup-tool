@@ -83,6 +83,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /settings/telegram", s.handleSaveTelegram)
 	mux.HandleFunc("POST /settings/telegram/test", s.handleTestTelegram)
 	mux.HandleFunc("POST /settings/general", s.handleSaveGeneral)
+	mux.HandleFunc("POST /settings/bandwidth", s.handleSaveBandwidth)
 
 	mux.HandleFunc("POST /update/check", s.handleUpdateCheck)
 	mux.HandleFunc("POST /update/apply", s.handleUpdateApply)
@@ -198,6 +199,7 @@ func funcMap() template.FuncMap {
 		},
 		"pct":      func(f float64) string { return fmt.Sprintf("%.1f", f) },
 		"speed":    func(f float64) string { return backup.HumanBytes(int64(f)) + "/sn" },
+		"mbit":     mbitPerSec,
 		"add":      func(a, b int) int { return a + b },
 		"sub":      func(a, b int) int { return a - b },
 		"cronText": scheduler.Describe,
@@ -219,6 +221,20 @@ func funcMap() template.FuncMap {
 		"upper": strings.ToUpper,
 		"list":  func(v ...string) []string { return v },
 	}
+}
+
+// mbitPerSec, bayt/sn hızını Mbit/sn olarak yazar (float64 veya int64 kabul eder).
+func mbitPerSec(v any) string {
+	var bps float64
+	switch n := v.(type) {
+	case float64:
+		bps = n
+	case int64:
+		bps = float64(n)
+	case int:
+		bps = float64(n)
+	}
+	return fmt.Sprintf("%.1f Mbit/sn", bps*8/1_000_000)
 }
 
 // ago, zamanı "3 sa önce" biçiminde yazar.

@@ -108,22 +108,33 @@ type HostKeyReporter interface {
 }
 
 // ctxReader, bağlam iptal edildiğinde okumayı keser ve ilerlemeyi bildirir.
+// Bağlamda hız sınırı varsa (WithRateLimit) okuma hızı ona göre yavaşlatılır.
 type ctxReader struct {
 	ctx      context.Context
 	r        io.Reader
 	n        int64
 	progress ProgressFunc
+	lim      *limiter
+	limInit  bool
 }
 
 func (c *ctxReader) Read(p []byte) (int, error) {
 	if err := c.ctx.Err(); err != nil {
 		return 0, err
 	}
+	if !c.limInit {
+		c.lim, c.limInit = limiterFrom(c.ctx), true
+	}
 	n, err := c.r.Read(p)
 	if n > 0 {
 		c.n += int64(n)
 		if c.progress != nil {
 			c.progress(c.n)
+		}
+		if c.lim != nil {
+			if werr := c.lim.wait(c.ctx, n); werr != nil {
+				return n, werr
+			}
 		}
 	}
 	return n, err

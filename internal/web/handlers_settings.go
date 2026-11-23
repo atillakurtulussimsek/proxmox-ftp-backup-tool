@@ -340,3 +340,40 @@ func (s *Server) handleSaveGeneral(w http.ResponseWriter, r *http.Request) {
 	}
 	s.flash(w, true, "Genel ayarlar kaydedildi.")
 }
+
+// MAX_MBIT, girilebilecek en yüksek hız sınırıdır (100 Gbit/sn).
+const MAX_MBIT = 100_000
+
+// mbitField, boş değeri 0 (sınırsız) kabul eder.
+func mbitField(r *http.Request, name string) (int, bool) {
+	v := strings.TrimSpace(r.PostFormValue(name))
+	if v == "" {
+		return 0, true
+	}
+	n, err := strconv.Atoi(v)
+	return n, err == nil && n >= 0 && n <= MAX_MBIT
+}
+
+func (s *Server) handleSaveBandwidth(w http.ResponseWriter, r *http.Request) {
+	up, ok1 := mbitField(r, "uploadMbit")
+	down, ok2 := mbitField(r, "downloadMbit")
+	if !ok1 || !ok2 {
+		s.flash(w, false, "Hız sınırı 0-%d Mbit/sn arasında bir tam sayı olmalı (boş = sınırsız)", MAX_MBIT)
+		return
+	}
+	if err := s.cfg.Update(func(c *config.Config) error {
+		c.Bandwidth = config.BandwidthLimit{UploadMbit: up, DownloadMbit: down}
+		return nil
+	}); err != nil {
+		s.flash(w, false, "Kaydedilemedi: %v", err)
+		return
+	}
+	s.flash(w, true, "Hız sınırı kaydedildi: yükleme %s, indirme %s. Süren aktarımlara da birkaç saniye içinde uygulanır.", mbitText(up), mbitText(down))
+}
+
+func mbitText(n int) string {
+	if n <= 0 {
+		return "sınırsız"
+	}
+	return strconv.Itoa(n) + " Mbit/sn"
+}

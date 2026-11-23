@@ -36,6 +36,7 @@ type Transfer struct {
 	Done    int64
 	Total   int64
 	Started time.Time
+	Limit   int64 // bayt/sn, 0 sınırsız (aktarım başladığındaki değer)
 }
 
 func (t Transfer) Percent() float64 {
@@ -160,6 +161,12 @@ func (r *Runner) update(fn func(s *Status)) {
 	if r.cur != nil {
 		fn(r.cur)
 	}
+}
+
+// uploadRate ve downloadRate, ayarlardaki güncel hız sınırını bayt/sn olarak verir.
+func (r *Runner) uploadRate() int64 { return config.BytesPerSec(r.cfg.Get().Bandwidth.UploadMbit) }
+func (r *Runner) downloadRate() int64 {
+	return config.BytesPerSec(r.cfg.Get().Bandwidth.DownloadMbit)
 }
 
 func (r *Runner) setPhase(phase string) {
@@ -519,7 +526,7 @@ func (r *Runner) uploadVerified(ctx context.Context, j *job, c ftpclient.Client,
 	tmp := path.Join(dir, UPLOAD_PREFIX+name)
 	r.update(func(s *Status) {
 		s.Phase = "Yükleniyor: " + name
-		s.Transfer = &Transfer{Name: name, Total: size, Started: time.Now()}
+		s.Transfer = &Transfer{Name: name, Total: size, Started: time.Now(), Limit: r.uploadRate()}
 	})
 	j.info("Yükleniyor: %s (%s)", name, HumanBytes(size))
 	t0 := time.Now()
@@ -530,7 +537,7 @@ func (r *Runner) uploadVerified(ctx context.Context, j *job, c ftpclient.Client,
 			}
 		})
 	}
-	if err := c.Upload(ctx, local, tmp, progress); err != nil {
+	if err := c.Upload(ftpclient.WithRateLimit(ctx, r.uploadRate), local, tmp, progress); err != nil {
 		_ = c.Delete(context.Background(), tmp)
 		return 0, err
 	}
@@ -718,9 +725,9 @@ func (r *Runner) restore(ctx context.Context, j *job, cfg config.Config, name, d
 	}
 	r.update(func(s *Status) {
 		s.Phase = "İndiriliyor: " + name
-		s.Transfer = &Transfer{Name: name, Total: size, Started: time.Now()}
+		s.Transfer = &Transfer{Name: name, Total: size, Started: time.Now(), Limit: r.downloadRate()}
 	})
-	err = client.Download(ctx, rp, f, func(n int64) {
+	err = client.Download(ftpclient.WithRateLimit(ctx, r.downloadRate), rp, f, func(n int64) {
 		r.update(func(s *Status) {
 			if s.Transfer != nil {
 				s.Transfer.Done = n

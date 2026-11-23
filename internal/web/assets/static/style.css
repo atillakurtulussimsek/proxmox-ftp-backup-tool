@@ -333,3 +333,4 @@ ul.plain { padding-left: 1rem; }
   .page-head .actions .btn { flex: 1; justify-content: center; }
 }
 .stat-sub.mono { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stack { min-width: 0; }

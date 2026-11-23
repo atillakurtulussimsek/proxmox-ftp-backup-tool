@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/atillakurtulussimsek/proxmox-ftp-backup-tool/internal/backup"
+	"github.com/atillakurtulussimsek/proxmox-ftp-backup-tool/internal/config"
 	"github.com/atillakurtulussimsek/proxmox-ftp-backup-tool/internal/ftpclient"
 )
 
@@ -141,7 +142,8 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Disposition", `attachment; filename="`+name+`"`)
 	h.Set("Content-Length", strconv.FormatInt(size, 10))
 	h.Set("Cache-Control", "no-store")
-	if err := client.Download(r.Context(), rp, w, nil); err != nil {
+	rate := func() int64 { return config.BytesPerSec(s.cfg.Get().Bandwidth.DownloadMbit) }
+	if err := client.Download(ftpclient.WithRateLimit(r.Context(), rate), rp, w, nil); err != nil {
 		s.log.Warn("indirme yarıda kaldı", "name", name, "err", err)
 	}
 }

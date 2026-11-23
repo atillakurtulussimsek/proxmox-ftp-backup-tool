@@ -35,6 +35,7 @@
   </form>
 </section>
 
+<div class="stack">
 <section class="card">
   <h2>Zamanlama</h2>
   <form hx-post="/settings/schedule" hx-target="#schedule-result">
@@ -51,6 +52,20 @@
     <div id="schedule-result"></div>
   </form>
 </section>
+
+<section class="card">
+  <h2>Hız sınırı</h2>
+  <form hx-post="/settings/bandwidth" hx-target="#bw-result">
+    <div class="form-grid">
+      <label>Yükleme (FTP'ye), Mbit/sn <input name="uploadMbit" type="number" min="0" max="100000" value="{{if .Cfg.Bandwidth.UploadMbit}}{{.Cfg.Bandwidth.UploadMbit}}{{end}}" placeholder="Sınırsız"></label>
+      <label>İndirme (geri alma ve tarayıcı), Mbit/sn <input name="downloadMbit" type="number" min="0" max="100000" value="{{if .Cfg.Bandwidth.DownloadMbit}}{{.Cfg.Bandwidth.DownloadMbit}}{{end}}" placeholder="Sınırsız"></label>
+    </div>
+    <p class="muted small">Boş veya 0 sınırsızdır. Örnek: 100 Mbit hatta yedeklemenin en fazla 40 Mbit kullanması için 40 yazın. Süren aktarımlara da birkaç saniye içinde uygulanır.</p>
+    <button class="btn primary" type="submit">Kaydet</button>
+    <div id="bw-result"></div>
+  </form>
+</section>
+</div>
 
 <section class="card wide">
   <h2>Yedekleme ve saklama</h2>
