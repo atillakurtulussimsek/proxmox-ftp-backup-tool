@@ -320,3 +320,34 @@ func (s *Store) Purge(before time.Time) (int64, error) {
 	n, _ := res.RowsAffected()
 	return n, tx.Commit()
 }
+
+// VMLast, bir VM'in en son yedekleme sonucudur.
+type VMLast struct {
+	JobID   int64
+	Status  string
+	Message string
+	At      time.Time
+}
+
+// LastVMResults, her VM için en son yedekleme işindeki sonucu döndürür.
+func (s *Store) LastVMResults() (map[int]VMLast, error) {
+	rows, err := s.db.Query(`SELECT v.vmid, v.job_id, v.status, v.message, j.started_at
+		FROM job_vms v JOIN jobs j ON j.id = v.job_id
+		WHERE v.rowid IN (SELECT MAX(rowid) FROM job_vms GROUP BY vmid)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int]VMLast{}
+	for rows.Next() {
+		var vmid int
+		var l VMLast
+		var at int64
+		if err := rows.Scan(&vmid, &l.JobID, &l.Status, &l.Message, &at); err != nil {
+			return nil, err
+		}
+		l.At = time.Unix(at, 0)
+		out[vmid] = l
+	}
+	return out, rows.Err()
+}

@@ -1,7 +1,7 @@
 {{define "content"}}
 {{with .Data}}{{with .Job}}
-<p><a href="/history">‹ Geçmiş</a></p>
-<h1>İş #{{.ID}} · {{kindText .Kind}}</h1>
+<header class="page-head"><div><p class="crumb"><a href="/history">Geçmiş</a> /</p><h1>{{kindText .Kind}} #{{.ID}}</h1></div></header>
+<div class="job-grid">
 <div class="card">
   <dl class="kv">
     <dt>Durum</dt><dd>{{template "badge" .Status}}</dd>
@@ -26,6 +26,7 @@
 </table>
 </div>
 {{end}}
+</div>
 {{end}}
 <div class="card">{{template "jobLog" .}}</div>
 {{end}}

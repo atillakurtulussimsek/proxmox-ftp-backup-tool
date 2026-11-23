@@ -103,7 +103,10 @@ pve-ftp-backup set-password
 ## Kullanım
 
 - **Kontrol Paneli:** çalışan işin canlı durumu (hangi VM, aşama, yükleme yüzdesi ve hızı,
-  son log satırları, İptal butonu), son iş, sonraki çalışma, FTP kullanımı, tek VM yedekleme.
+  son log satırları, İptal butonu); son iş, sonraki çalışma, FTP kullanımı ve geçici alan
+  özeti; tüm VM'ler tek tabloda: son yedeğin yaşı (36 saate kadar yeşil, 7 güne kadar sarı,
+  daha eskiyse kırmızı), son denemenin sonucu, FTP'deki set sayısı / KEEP, tek VM yedekleme.
+  Tablo ad/ID ile aranabilir, "Yedeklenenler" ve "Sorunlu" filtreleri vardır.
 - **Yedekler:** FTP'deki yedekler VM bazında gruplanır; toplam ve VM bazında kullanılan alan
   gösterilir. Satır işlemleri: İndir (tarayıcıya akış), Proxmox'a geri al, Sil.
 - **Geçmiş:** tüm işler; satıra tıklayınca VM sonuçları ve tam log açılır. Kayıtlar

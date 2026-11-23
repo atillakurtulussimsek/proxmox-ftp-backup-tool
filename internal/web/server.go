@@ -65,7 +65,6 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", cacheStatic(http.FileServerFS(static))))
 
 	mux.HandleFunc("GET /{$}", s.handleDashboard)
-	mux.HandleFunc("GET /dashboard/usage", s.handleUsage)
 	mux.HandleFunc("GET /dashboard/guests", s.handleDashboardGuests)
 
 	mux.HandleFunc("GET /backups", s.handleBackups)
@@ -172,6 +171,9 @@ type flash struct {
 }
 
 func (s *Server) flash(w http.ResponseWriter, ok bool, format string, args ...any) {
+	// Tüm mesajlar sayfanın sağ altındaki ortak bildirim alanında gösterilir.
+	w.Header().Set("HX-Retarget", "#flash")
+	w.Header().Set("HX-Reswap", "innerHTML")
 	s.fragment(w, "flash", flash{OK: ok, Msg: fmt.Sprintf(format, args...)})
 }
 
@@ -213,9 +215,29 @@ func funcMap() template.FuncMap {
 			}
 			return false
 		},
+		"ago":   ago,
 		"upper": strings.ToUpper,
 		"list":  func(v ...string) []string { return v },
 	}
+}
+
+// ago, zamanı "3 sa önce" biçiminde yazar.
+func ago(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	d := time.Since(t)
+	switch {
+	case d < 0:
+		return t.Local().Format("02.01 15:04")
+	case d < time.Minute:
+		return "az önce"
+	case d < time.Hour:
+		return fmt.Sprintf("%d dk önce", int(d.Minutes()))
+	case d < 48*time.Hour:
+		return fmt.Sprintf("%d sa önce", int(d.Hours()))
+	}
+	return fmt.Sprintf("%d gün önce", int(d.Hours()/24))
 }
 
 func statusClass(s string) string {

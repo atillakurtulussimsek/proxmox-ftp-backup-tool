@@ -1,58 +1,73 @@
 {{define "content"}}
 {{with .Data}}
-<h1>Kontrol Paneli</h1>
-<div id="flash"></div>
+<header class="page-head">
+  <div>
+    <h1>Kontrol Paneli</h1>
+    {{if .FTPConfigured}}<p class="sub mono">{{.FTPTarget}}</p>{{end}}
+  </div>
+  <div class="actions">
+    <button class="btn" hx-post="/jobs/cleanup" hx-target="#flash" hx-confirm="Saklama temizliği şimdi çalıştırılsın mı? KEEP değerinden eski yedekler FTP'den silinecek.">Eski yedekleri temizle</button>
+    <button class="btn primary" hx-post="/jobs/backup" hx-target="#flash" hx-confirm="Seçili {{.SelectedCount}} VM şimdi yedeklensin mi?" {{if not .SelectedCount}}disabled{{end}}>Seçili {{.SelectedCount}} VM'i yedekle</button>
+  </div>
+</header>
 
-<div id="job-status" hx-get="/jobs/status" hx-trigger="load, every 2s, jobChanged from:body">
-  <div class="card"><p class="muted">Durum yükleniyor…</p></div>
-</div>
+{{if not .FTPConfigured}}<div class="alert err">FTP sunucusu ayarlanmamış; yedekleme çalışmaz. <a href="/settings">Ayarlar</a> sayfasından girin.</div>{{end}}
 
-<div class="grid">
-  <section class="card">
-    <h2>Son iş</h2>
+<div id="job-status" hx-get="/jobs/status" hx-trigger="load, every 2s, jobChanged from:body"></div>
+
+<section class="stats" hx-get="/" hx-select=".stats" hx-swap="outerHTML" hx-trigger="jobFinished from:body">
+  <div class="stat">
+    <span class="eyebrow">Son iş</span>
     {{with .Last}}
-      <p><a href="/history/{{.ID}}">#{{.ID}} {{kindText .Kind}}</a> {{template "badge" .Status}}</p>
-      <p class="muted">{{triggerText .Trigger}} · {{ts .StartedAt}} · {{dur .Duration}}</p>
-      {{if .Summary}}<p>{{.Summary}}</p>{{end}}
-    {{else}}<p class="muted">Henüz iş çalışmadı.</p>{{end}}
-  </section>
-
-  <section class="card">
-    <h2>Zamanlama</h2>
+      <div class="stat-main"><a href="/history/{{.ID}}">{{kindText .Kind}} #{{.ID}}</a> {{template "badge" .Status}}</div>
+      <p class="stat-sub" title="{{ts .StartedAt}}">{{ago .StartedAt}} · {{triggerText .Trigger}} · {{dur .Duration}}</p>
+    {{else}}
+      <div class="stat-main muted">Henüz iş yok</div>
+    {{end}}
+  </div>
+  <div class="stat">
+    <span class="eyebrow">Sonraki çalışma</span>
     {{if .ScheduleOn}}
-      <p><b>{{cronText .Cron}}</b> <span class="muted mono">({{.Cron}})</span></p>
-      <p>Sonraki çalışma: <b>{{ts .NextRun}}</b></p>
-    {{else}}<p class="muted">Zamanlanmış yedekleme kapalı.</p>{{end}}
-    <p class="muted">Seçili VM: {{.SelectedCount}}</p>
-  </section>
-
-  <section class="card">
-    <h2>Yerel geçici alan</h2>
-    <p class="mono">{{.DumpDir}}</p>
-    {{if .FreeErr}}<p class="text-err">{{.FreeErr}}</p>{{else}}<p class="big">{{bytes .FreeSpace}} boş</p>{{end}}
-  </section>
-</div>
-
-<section class="card">
-  <h2>İşlemler</h2>
-  {{if not .FTPConfigured}}<div class="alert err">FTP ayarları eksik. <a href="/settings">Ayarlar</a> sayfasından girin.</div>{{end}}
-  <div class="row wrap gap">
-    <button class="btn primary" hx-post="/jobs/backup" hx-target="#flash" hx-confirm="Seçili tüm VM'ler ({{.SelectedCount}}) şimdi yedeklensin mi?" {{if not .SelectedCount}}disabled{{end}}>Şimdi Yedekle (seçili tümü)</button>
-    <button class="btn" hx-post="/jobs/cleanup" hx-target="#flash" hx-confirm="Saklama temizliği şimdi çalıştırılsın mı? KEEP değerinden eski yedekler FTP'den silinecek.">Şimdi Temizle</button>
+      <div class="stat-main num">{{ts .NextRun}}</div>
+      <p class="stat-sub">{{cronText .Cron}}</p>
+    {{else}}
+      <div class="stat-main muted">Zamanlama kapalı</div>
+      <p class="stat-sub"><a href="/settings">Zamanlamayı aç</a></p>
+    {{end}}
+  </div>
+  <div class="stat" id="stat-ftp">
+    <span class="eyebrow">FTP'deki yedekler</span>
+    <div class="stat-main muted">{{if .FTPConfigured}}Yükleniyor…{{else}}Ayarlanmamış{{end}}</div>
+  </div>
+  <div class="stat">
+    <span class="eyebrow">Geçici alan</span>
+    {{if .FreeErr}}
+      <div class="stat-main text-err">Okunamadı</div>
+      <p class="stat-sub">{{.FreeErr}}</p>
+    {{else}}
+      <div class="stat-main num">{{bytes .FreeSpace}} <span class="unit">boş</span></div>
+      <div class="meter {{if ge .DiskUsedPct 90}}err{{else if ge .DiskUsedPct 75}}warn{{end}}" role="img" aria-label="%{{.DiskUsedPct}} dolu"><span style="width: {{.DiskUsedPct}}%"></span></div>
+      <p class="stat-sub mono">{{.DumpDir}} · {{bytes .DiskTotal}}</p>
+    {{end}}
   </div>
 </section>
 
-<div class="grid two">
-  <section class="card">
-    <h2>FTP kullanımı</h2>
-    {{if .FTPConfigured}}<p class="muted small mono">{{.FTPTarget}}</p>
-    <div hx-get="/dashboard/usage" hx-trigger="load"><p class="muted">Yükleniyor…</p></div>
-    {{else}}<p class="muted">FTP ayarlanmamış.</p>{{end}}
-  </section>
-  <section class="card">
-    <h2>Bu node'daki VM/LXC'ler</h2>
-    <div hx-get="/dashboard/guests" hx-trigger="load"><p class="muted">Yükleniyor…</p></div>
-  </section>
-</div>
+<section class="panel" id="vm-panel">
+  <div class="panel-head">
+    <h2>Sanal makineler ve kapsayıcılar</h2>
+    <div class="toolbar">
+      <input type="search" class="search" placeholder="ID veya ad ara" aria-label="VM ara" data-filter-search>
+      <div class="chips" role="group" aria-label="Filtre">
+        <button type="button" class="chip on" data-filter="all">Tümü</button>
+        <button type="button" class="chip" data-filter="sel">Yedeklenenler</button>
+        <button type="button" class="chip" data-filter="issue">Sorunlu</button>
+      </div>
+      <button type="button" class="btn ghost sm" hx-get="/dashboard/guests" hx-target="#vm-table" hx-indicator="#vm-panel" title="Listeyi yenile">Yenile</button>
+    </div>
+  </div>
+  <div id="vm-table" hx-get="/dashboard/guests" hx-trigger="load, jobFinished from:body">
+    <p class="empty">VM listesi ve FTP'deki yedekler alınıyor…</p>
+  </div>
+</section>
 {{end}}
 {{end}}

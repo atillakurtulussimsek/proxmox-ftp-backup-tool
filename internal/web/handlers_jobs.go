@@ -24,6 +24,8 @@ type dashboardData struct {
 	SelectedCount int
 	DumpDir       string
 	FreeSpace     int64
+	DiskTotal     int64
+	DiskUsedPct   int
 	FreeErr       string
 }
 
@@ -43,10 +45,13 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		SelectedCount: len(cfg.Backup.VMIDs),
 		DumpDir:       cfg.Backup.DumpDir,
 	}
-	if free, err := backup.FreeSpace(cfg.Backup.DumpDir); err != nil {
+	if free, total, err := backup.DiskSpace(cfg.Backup.DumpDir); err != nil {
 		d.FreeErr = err.Error()
 	} else {
-		d.FreeSpace = free
+		d.FreeSpace, d.DiskTotal = free, total
+		if total > 0 {
+			d.DiskUsedPct = int((total - free) * 100 / total)
+		}
 	}
 	s.render(w, r, "dashboard", "Kontrol Paneli", d)
 }
@@ -56,25 +61,6 @@ func ftpTarget(cfg config.Config) string {
 		return ""
 	}
 	return cfg.FTP.Protocol + "://" + cfg.FTP.Username + "@" + cfg.FTP.Host + ":" + strconv.Itoa(cfg.FTP.Port) + cfg.FTP.RemoteDir
-}
-
-type usageData struct {
-	Err    string
-	Total  int64
-	Count  int
-	Groups []groupView
-}
-
-func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
-	groups, _, total, err := s.loadRemote(r.Context())
-	d := usageData{Total: total, Groups: groups}
-	if err != nil {
-		d.Err = err.Error()
-	}
-	for _, g := range groups {
-		d.Count += len(g.Sets)
-	}
-	s.fragment(w, "usage", d)
 }
 
 type guestRow struct {
@@ -107,8 +93,109 @@ func (s *Server) guestRows(ctx context.Context) guestsData {
 	return d
 }
 
+// Yedek tazeliği eşikleri: son yedek bu sürelerden eskiyse uyarı/hata sayılır.
+const (
+	FRESH_OK_AGE   = 36 * time.Hour
+	FRESH_WARN_AGE = 7 * 24 * time.Hour
+	MAX_SLOTS      = 14
+)
+
+// vmRow, Kontrol Paneli tablosundaki bir VM satırıdır.
+type vmRow struct {
+	backup.Guest
+	Selected bool
+	Keep     int
+	Last     *store.VMLast
+	Sets     int
+	Size     int64
+	Newest   time.Time
+	Slots    []bool
+	Fresh    string // ok | warn | err | none
+	Issue    bool
+}
+
+type vmTableData struct {
+	Err       string
+	FTPOn     bool
+	FTPErr    string
+	FTPTarget string
+	FTPTotal  int64
+	FTPVMs    int
+	FTPSets   int
+	Rows      []vmRow
+	Selected  int
+	Issues    int
+}
+
+func freshness(newest time.Time) string {
+	switch age := time.Since(newest); {
+	case newest.IsZero():
+		return "none"
+	case age <= FRESH_OK_AGE:
+		return "ok"
+	case age <= FRESH_WARN_AGE:
+		return "warn"
+	}
+	return "err"
+}
+
 func (s *Server) handleDashboardGuests(w http.ResponseWriter, r *http.Request) {
-	s.fragment(w, "dashboardGuests", s.guestRows(r.Context()))
+	cfg := s.cfg.Get()
+	d := vmTableData{FTPOn: cfg.FTPConfigured(), FTPTarget: ftpTarget(cfg)}
+	g := s.guestRows(r.Context())
+	if g.Err != "" {
+		d.Err = g.Err
+	}
+
+	remote := map[int]groupView{}
+	if d.FTPOn {
+		groups, _, total, err := s.loadRemote(r.Context())
+		if err != nil {
+			d.FTPErr = err.Error()
+		} else {
+			d.FTPTotal, d.FTPVMs = total, len(groups)
+			for _, gv := range groups {
+				remote[gv.VMID] = gv
+				d.FTPSets += len(gv.Sets)
+			}
+		}
+	}
+	last, err := s.st.LastVMResults()
+	if err != nil {
+		s.log.Error("VM sonuçları okunamadı", "err", err)
+	}
+
+	for _, gr := range g.Guests {
+		row := vmRow{Guest: gr.Guest, Selected: gr.Selected, Keep: cfg.KeepFor(gr.VMID)}
+		if l, ok := last[gr.VMID]; ok {
+			row.Last = &l
+		}
+		if gv, ok := remote[gr.VMID]; ok {
+			row.Sets, row.Size = len(gv.Sets), gv.Size
+			if len(gv.Sets) > 0 {
+				row.Newest = gv.Sets[0].Time
+			}
+		}
+		if row.Newest.IsZero() && d.FTPErr != "" && row.Last != nil && row.Last.Status == store.STATUS_SUCCESS {
+			row.Newest = row.Last.At
+		}
+		row.Fresh = freshness(row.Newest)
+		n := min(max(row.Keep, row.Sets), MAX_SLOTS)
+		row.Slots = make([]bool, n)
+		for i := range row.Slots {
+			row.Slots[i] = i < row.Sets
+		}
+		failed := row.Last != nil && row.Last.Status != store.STATUS_SUCCESS
+		row.Issue = failed || (row.Selected && (row.Fresh == "none" || row.Fresh == "err"))
+		if row.Selected {
+			d.Selected++
+		}
+		if row.Issue {
+			d.Issues++
+		}
+		d.Rows = append(d.Rows, row)
+	}
+	s.fragment(w, "vmTable", d)
 }
 
 // ---------------------------------------------------------------- iş tetikleme

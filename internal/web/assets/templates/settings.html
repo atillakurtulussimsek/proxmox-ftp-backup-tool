@@ -1,6 +1,7 @@
 {{define "content"}}
 {{with .Data}}
-<h1>Ayarlar</h1>
+<header class="page-head"><div><h1>Ayarlar</h1></div></header>
+<div class="settings">
 
 <section class="card">
   <h2>FTP sunucusu</h2>
@@ -35,6 +36,23 @@
 </section>
 
 <section class="card">
+  <h2>Zamanlama</h2>
+  <form hx-post="/settings/schedule" hx-target="#schedule-result">
+    <div class="checks"><label><input type="checkbox" name="enabled" {{if .Cfg.Schedule.Enabled}}checked{{end}}> Zamanlanmış yedekleme açık</label></div>
+    <div class="form-grid">
+      <label>Cron ifadesi <span class="muted small">(dakika saat gün ay haftanın-günü)</span>
+        <input name="cron" class="mono" value="{{.Cfg.Schedule.Cron}}" required
+          hx-get="/settings/cron-preview" hx-trigger="input changed delay:400ms" hx-target="#cron-preview">
+      </label>
+    </div>
+    <p id="cron-preview" class="small">{{if .CronErr}}<span class="text-err">{{.CronErr}}</span>{{else}}<b>{{.CronDesc}}</b> · Sonraki: {{range $i, $t := .NextRuns}}{{if $i}}, {{end}}{{$t.Format "02.01.2006 15:04"}}{{end}}{{end}}</p>
+    <p class="muted small">Örnekler: <code>0 2 * * *</code> her gün 02:00 · <code>30 1 * * 1-5</code> hafta içi 01:30 · <code>0 3 * * 0</code> her Pazar 03:00</p>
+    <button class="btn primary" type="submit">Kaydet</button>
+    <div id="schedule-result"></div>
+  </form>
+</section>
+
+<section class="card wide">
   <h2>Yedekleme ve saklama</h2>
   <form hx-post="/settings/backup" hx-target="#backup-result">
     <div class="form-grid">
@@ -52,28 +70,11 @@
       <label>Varsayılan KEEP <input name="defaultKeep" type="number" min="1" max="1000" value="{{.Cfg.Backup.DefaultKeep}}" required></label>
     </div>
     <h3>VM / LXC seçimi</h3>
-    <div hx-get="/settings/guests" hx-trigger="load"><p class="muted">VM listesi alınıyor…</p></div>
+    <div hx-get="/settings/guests" hx-trigger="load" hx-target="this"><p class="muted">VM listesi alınıyor…</p></div>
     <div class="row gap">
       <button class="btn primary" type="submit">Kaydet</button>
     </div>
     <div id="backup-result"></div>
-  </form>
-</section>
-
-<section class="card">
-  <h2>Zamanlama</h2>
-  <form hx-post="/settings/schedule" hx-target="#schedule-result">
-    <div class="checks"><label><input type="checkbox" name="enabled" {{if .Cfg.Schedule.Enabled}}checked{{end}}> Zamanlanmış yedekleme açık</label></div>
-    <div class="form-grid">
-      <label>Cron ifadesi <span class="muted small">(dakika saat gün ay haftanın-günü)</span>
-        <input name="cron" class="mono" value="{{.Cfg.Schedule.Cron}}" required
-          hx-get="/settings/cron-preview" hx-trigger="input changed delay:400ms" hx-target="#cron-preview">
-      </label>
-    </div>
-    <p id="cron-preview" class="small">{{if .CronErr}}<span class="text-err">{{.CronErr}}</span>{{else}}<b>{{.CronDesc}}</b> · Sonraki: {{range $i, $t := .NextRuns}}{{if $i}}, {{end}}{{$t.Format "02.01.2006 15:04"}}{{end}}{{end}}</p>
-    <p class="muted small">Örnekler: <code>0 2 * * *</code> her gün 02:00 · <code>30 1 * * 1-5</code> hafta içi 01:30 · <code>0 3 * * 0</code> her Pazar 03:00</p>
-    <button class="btn primary" type="submit">Kaydet</button>
-    <div id="schedule-result"></div>
   </form>
 </section>
 
@@ -110,7 +111,7 @@
   <p class="muted small">Dinleme adresi: <span class="mono">{{.Cfg.Listen}}</span>{{if .Cfg.TLSCert}} · HTTPS açık{{end}}. Bu değerler <span class="mono">/etc/pve-ftp-backup/config.json</span> dosyasından değiştirilir ve servis yeniden başlatılınca geçerli olur. Arayüz şifresi: <span class="mono">pve-ftp-backup set-password</span>.</p>
 </section>
 
-<section class="card">
+<section class="card wide">
   <h2>Güncelleme</h2>
   <p>Kurulu sürüm: <span class="mono">{{$.Version}}</span></p>
   <div class="row gap wrap">
@@ -120,5 +121,6 @@
   <div id="update-result"></div>
   <p class="muted small">Sürümler GitHub Releases'tan alınır; indirilen binary SHA256SUMS ile doğrulanır. Çalışan bir iş varken güncelleme yapılamaz.</p>
 </section>
+</div>
 {{end}}
 {{end}}

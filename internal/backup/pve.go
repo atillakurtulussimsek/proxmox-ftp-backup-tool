@@ -62,6 +62,15 @@ func ListGuests(ctx context.Context) ([]Guest, error) {
 	return guests, nil
 }
 
+// DiskSpace, klasörün bulunduğu dosya sistemindeki boş ve toplam alanı döndürür.
+func DiskSpace(dir string) (free, total int64, err error) {
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(dir, &st); err != nil {
+		return 0, 0, err
+	}
+	return int64(uint64(st.Bavail) * uint64(st.Bsize)), int64(uint64(st.Blocks) * uint64(st.Bsize)), nil
+}
+
 // FreeSpace, verilen klasörün bulunduğu dosya sistemindeki boş alanı döndürür.
 func FreeSpace(dir string) (int64, error) {
 	var st syscall.Statfs_t

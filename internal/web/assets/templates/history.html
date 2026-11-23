@@ -1,8 +1,7 @@
 {{define "content"}}
 {{with .Data}}
-<h1>Geçmiş</h1>
-<p class="muted">Toplam {{.Total}} kayıt</p>
-<div class="card tbl">
+<header class="page-head"><div><h1>Geçmiş</h1><p class="sub">Toplam {{.Total}} kayıt</p></div></header>
+<div class="panel tbl">
 <table class="clickable">
 <thead><tr><th>#</th><th>Başlangıç</th><th>Süre</th><th>Tür</th><th>Tetikleme</th><th>Durum</th><th>VM sonuçları</th></tr></thead>
 <tbody>

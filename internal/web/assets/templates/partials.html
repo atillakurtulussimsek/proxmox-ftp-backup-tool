@@ -1,62 +1,80 @@
-{{define "flash"}}<div class="alert {{if .OK}}ok{{else}}err{{end}}" role="status">{{.Msg}}</div>{{end}}
+{{define "flash"}}<div class="toast {{if .OK}}ok{{else}}err{{end}}" role="status">{{.Msg}}<button type="button" class="toast-x" aria-label="Kapat" data-dismiss>×</button></div>{{end}}
 
 {{define "badge"}}<span class="badge {{statusClass .}}">{{statusText .}}</span>{{end}}
 
 {{define "jobStatus"}}
 {{if .Running}}
-<div class="card running">
-  <div class="row between">
-    <h2>Çalışan iş: {{kindText .S.Kind}} <a href="/history/{{.S.JobID}}">#{{.S.JobID}}</a></h2>
-    {{if .S.Cancelling}}<span class="badge warn">İptal ediliyor…</span>{{else}}
-    <button class="btn danger sm" hx-post="/jobs/cancel" hx-target="#flash" hx-confirm="Çalışan iş iptal edilsin mi?">İptal</button>{{end}}
+<section class="job">
+  <div class="job-info">
+    <div class="job-title">
+      <span class="pulse" aria-hidden="true"></span>
+      <h2>{{kindText .S.Kind}} sürüyor <a href="/history/{{.S.JobID}}">#{{.S.JobID}}</a></h2>
+      {{if .S.Cancelling}}<span class="badge warn">İptal ediliyor…</span>{{else}}
+      <button class="btn danger sm" hx-post="/jobs/cancel" hx-target="#flash" hx-confirm="Çalışan iş iptal edilsin mi?">İptal et</button>{{end}}
+    </div>
+    <p class="stat-sub">{{triggerText .S.Trigger}} · {{ts .S.Started}} başladı</p>
+    {{if .S.VMCount}}
+    <div class="job-vm">
+      <span class="eyebrow">VM {{.S.VMIndex}} / {{.S.VMCount}}</span>
+      <div class="job-vm-name">{{if .S.VMID}}<span class="mono">{{.S.VMID}}</span> {{.S.VMName}}{{end}}</div>
+    </div>
+    {{end}}
+    <p class="job-phase">{{.S.Phase}}</p>
+    {{with .S.Transfer}}
+    <div class="progress"><span style="width: {{pct .Percent}}%"></span></div>
+    <p class="stat-sub num">%{{pct .Percent}} · {{bytes .Done}} / {{bytes .Total}} · {{speed .Speed}}</p>
+    {{end}}
   </div>
-  <p class="muted">{{triggerText .S.Trigger}} · başladı {{ts .S.Started}}</p>
-  {{if .S.VMCount}}<p><b>VM {{.S.VMIndex}}/{{.S.VMCount}}</b>{{if .S.VMID}} — {{.S.VMID}}{{if .S.VMName}} ({{.S.VMName}}){{end}}{{end}}</p>{{end}}
-  <p>{{.S.Phase}}</p>
-  {{with .S.Transfer}}
-  <div class="progress"><div class="bar" style="width: {{pct .Percent}}%"></div></div>
-  <p class="muted small">{{pct .Percent}}% · {{bytes .Done}} / {{bytes .Total}} · {{speed .Speed}}</p>
-  {{end}}
-  {{if .Logs}}<pre class="log short">{{range .Logs}}<span class="lv-{{.Level}}">{{.Time.Format "15:04:05"}} {{.Msg}}</span>
-{{end}}</pre>{{end}}
+  <pre class="log job-log">{{range .Logs}}<span class="lv-{{.Level}}">{{.Time.Format "15:04:05"}} {{.Msg}}</span>
+{{else}}Log bekleniyor…{{end}}</pre>
+</section>
+{{end}}
+{{end}}
+
+{{define "vmTable"}}
+<div class="stat" id="stat-ftp" hx-swap-oob="true">
+  <span class="eyebrow">FTP'deki yedekler</span>
+  {{if not .FTPOn}}<div class="stat-main muted">Ayarlanmamış</div><p class="stat-sub"><a href="/settings">FTP'yi ayarla</a></p>
+  {{else if .FTPErr}}<div class="stat-main text-err">Bağlanılamadı</div><p class="stat-sub">{{.FTPErr}}</p>
+  {{else}}<div class="stat-main num">{{bytes .FTPTotal}}</div><p class="stat-sub">{{.FTPVMs}} VM · {{.FTPSets}} yedek seti · <a href="/backups">Yedekleri aç</a></p>{{end}}
 </div>
-{{else}}
-<div class="card"><p class="muted">Şu anda çalışan iş yok.</p></div>
-{{end}}
-{{end}}
-
-{{define "usage"}}
-{{if .Err}}<div class="alert err">{{.Err}}</div>
-{{else}}
-<p class="big">{{bytes .Total}}</p>
-<p class="muted">{{len .Groups}} VM · {{.Count}} yedek seti</p>
-{{if .Groups}}
-<div class="tbl"><table>
-<thead><tr><th>VM</th><th>Ad</th><th class="r">Set</th><th class="r">Boyut</th></tr></thead>
-<tbody>{{range .Groups}}<tr><td>{{.VMID}}</td><td>{{.Name}}</td><td class="r">{{len .Sets}}</td><td class="r">{{bytes .Size}}</td></tr>{{end}}</tbody>
-</table></div>
-{{end}}
-{{end}}
-{{end}}
-
-{{define "dashboardGuests"}}
 {{if .Err}}<div class="alert err">VM listesi alınamadı: {{.Err}}</div>
-{{else if not .Guests}}<p class="muted">Bu node üzerinde VM/LXC yok.</p>
+{{else if not .Rows}}<p class="empty">Bu node üzerinde VM veya LXC yok.</p>
 {{else}}
-<div class="tbl"><table>
-<thead><tr><th>ID</th><th>Ad</th><th>Tür</th><th>Durum</th><th>Seçili</th><th></th></tr></thead>
+{{if .FTPErr}}<div class="alert err">FTP'ye bağlanılamadı; yedek sütunları uygulamanın kendi kayıtlarından gösteriliyor. {{.FTPErr}}</div>{{end}}
+<div class="tbl" data-counts data-all="{{len .Rows}}" data-sel="{{.Selected}}" data-issue="{{.Issues}}">
+<table class="vms">
+<thead><tr>
+  <th class="c-id">ID</th><th>Ad</th><th>Durum</th><th class="r">Disk</th>
+  <th>Son yedek</th><th>FTP'deki setler</th><th class="r"><span class="sr">İşlem</span></th>
+</tr></thead>
 <tbody>
-{{range .Guests}}
-<tr>
-  <td>{{.VMID}}</td><td>{{.Name}}</td><td>{{typeText .Type}}</td>
-  <td><span class="badge {{if eq .Status "running"}}ok{{else}}muted{{end}}">{{.Status}}</span></td>
-  <td>{{if .Selected}}✔{{end}}</td>
-  <td class="r"><button class="btn sm" hx-post="/jobs/backup" hx-vals='{"vmid":"{{.VMID}}"}' hx-target="#flash" hx-confirm="VM {{.VMID}} şimdi yedeklensin mi?">Yedekle</button></td>
+{{range .Rows}}
+<tr data-search="{{.VMID}} {{.Name}}" {{if .Selected}}data-sel{{end}} {{if .Issue}}data-issue{{end}} class="{{if not .Selected}}off{{end}}">
+  <td class="c-id mono">{{.VMID}}</td>
+  <td>
+    <div class="vm-name">{{.Name}}</div>
+    <div class="vm-meta"><span class="tag">{{typeText .Type}}</span>{{if .Selected}}<span class="tag on">Yedekleniyor</span>{{else}}<span class="tag">Yedek dışı</span>{{end}}</div>
+  </td>
+  <td><span class="dot {{if eq .Status "running"}}ok{{end}}"></span>{{if eq .Status "running"}}Çalışıyor{{else if eq .Status "stopped"}}Durdu{{else}}{{.Status}}{{end}}</td>
+  <td class="r num nowrap">{{bytes .MaxDisk}}</td>
+  <td class="nowrap">
+    {{if .Newest.IsZero}}<span class="age none">Yedek yok</span>{{else}}<span class="age {{.Fresh}}" title="{{ts .Newest}}">{{ago .Newest}}</span>{{end}}
+    {{with .Last}}{{if ne .Status "success"}}<div><a href="/history/{{.JobID}}" class="badge {{statusClass .Status}}" title="{{.Message}}">Son deneme: {{statusText .Status}}</a></div>{{end}}{{end}}
+  </td>
+  <td>
+    <div class="slots" title="{{.Sets}} set, KEEP {{.Keep}}">{{range .Slots}}<i {{if .}}class="f"{{end}}></i>{{end}}</div>
+    <div class="vm-meta num">{{.Sets}} / {{.Keep}}{{if .Size}} · {{bytes .Size}}{{end}}</div>
+  </td>
+  <td class="r"><button class="btn sm" hx-post="/jobs/backup" hx-vals='{"vmid":"{{.VMID}}"}' hx-target="#flash" hx-confirm="VM {{.VMID}} ({{.Name}}) şimdi yedeklensin mi?">Yedekle</button></td>
 </tr>
 {{end}}
-</tbody></table></div>
+</tbody></table>
+<p class="empty" data-no-match hidden>Filtreye uyan VM yok.</p>
+</div>
 {{end}}
 {{end}}
+
 
 {{define "settingsGuests"}}
 {{if .Err}}<div class="alert err">VM listesi alınamadı: {{.Err}}. Mevcut seçimler korunacak.</div>
