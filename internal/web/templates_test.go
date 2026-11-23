@@ -24,7 +24,7 @@ func TestFragments(t *testing.T) {
 			Transfer: &backup.Transfer{Name: "x", Done: 10, Total: 100, Started: now.Add(-time.Second), Limit: 1_000_000},
 		}, Logs: []store.LogLine{{Time: now, Level: "info", Msg: "m"}}},
 		"vmTable": vmTableData{FTPOn: true, Rows: []vmRow{{
-			Guest: backup.Guest{VMID: 100, Name: "web", Type: "qemu", Status: "running", MaxDisk: 1 << 30},
+			Guest:    backup.Guest{VMID: 100, Name: "web", Type: "qemu", Status: "running", MaxDisk: 1 << 30},
 			Selected: true, Keep: 3, Sets: 2, Size: 10, Newest: now, Slots: []bool{true, true, false}, Fresh: "ok",
 			Last: &store.VMLast{JobID: 1, Status: store.STATUS_FAILED, Message: "hata", At: now},
 		}}},
