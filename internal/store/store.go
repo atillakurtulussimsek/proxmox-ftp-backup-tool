@@ -351,3 +351,26 @@ func (s *Store) LastVMResults() (map[int]VMLast, error) {
 	}
 	return out, rows.Err()
 }
+
+// Window, bir işin başlangıç ve bitiş zamanıdır.
+type Window struct {
+	Start, End time.Time
+}
+
+// BackupWindows, bitmiş tüm yedekleme işlerinin zaman aralıklarını döndürür.
+func (s *Store) BackupWindows() ([]Window, error) {
+	rows, err := s.db.Query(`SELECT started_at, finished_at FROM jobs WHERE kind=? AND finished_at > 0`, KIND_BACKUP)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Window
+	for rows.Next() {
+		var a, b int64
+		if err := rows.Scan(&a, &b); err != nil {
+			return nil, err
+		}
+		out = append(out, Window{Start: time.Unix(a, 0), End: time.Unix(b, 0)})
+	}
+	return out, rows.Err()
+}

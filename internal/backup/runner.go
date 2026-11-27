@@ -294,6 +294,8 @@ func (r *Runner) runBackup(ctx context.Context, j *job, cfg config.Config, vmids
 	j.info("Yedekleme başladı. VM sayısı: %d, mod: %s, sıkıştırma: %s, geçici klasör: %s",
 		len(vmids), cfg.Backup.Mode, cfg.Backup.Compress, cfg.Backup.DumpDir)
 
+	r.cleanDumpDir(j, cfg.Backup.DumpDir)
+
 	r.setPhase("VM listesi alınıyor")
 	guests, err := ListGuests(ctx)
 	if err != nil {
@@ -512,6 +514,39 @@ func (r *Runner) backupOne(ctx context.Context, j *job, cfg config.Config, vmid 
 	return res
 }
 
+// cleanDumpDir, geçici klasörde önceki işlerden kalanları siler. Hata işi durdurmaz.
+func (r *Runner) cleanDumpDir(j *job, dumpDir string) {
+	r.setPhase("Geçici klasör temizleniyor")
+	windows, err := r.st.BackupWindows()
+	if err != nil {
+		j.warn("Geçici klasör temizlenemedi: iş geçmişi okunamadı: %v", err)
+		return
+	}
+	left, err := FindLeftovers(dumpDir, windows)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			j.warn("Geçici klasör temizlenemedi: %v", err)
+		}
+		return
+	}
+	if len(left) == 0 {
+		j.info("Geçici klasörde önceki işlerden kalan dosya yok")
+		return
+	}
+	var freed int64
+	removed := 0
+	for _, l := range left {
+		if err := RemoveLeftover(l); err != nil {
+			j.warn("Kalıntı silinemedi: %s: %v", l.Path, err)
+			continue
+		}
+		removed++
+		freed += l.Size
+		j.info("Önceki işten kalan silindi: %s (%s)", filepath.Base(l.Path), HumanBytes(l.Size))
+	}
+	j.info("Geçici klasör temizlendi: %d öğe, %s boşaldı", removed, HumanBytes(freed))
+}
+
 // uploadVerified, dosyayı hedef klasörüne (backup/<vmid> veya logs/<vmid>) geçici adla
 // yükler, boyutunu doğrular ve asıl adına taşır.
 func (r *Runner) uploadVerified(ctx context.Context, j *job, c ftpclient.Client, local, name string, size int64) (int64, error) {
@@ -718,7 +753,7 @@ func (r *Runner) restore(ctx context.Context, j *job, cfg config.Config, name, d
 	if free < size {
 		return 0, fmt.Errorf("yetersiz boş alan: gerekli %s, mevcut %s", HumanBytes(size), HumanBytes(free))
 	}
-	tmp := filepath.Join(cfg.Backup.DumpDir, ".restore-"+name)
+	tmp := filepath.Join(cfg.Backup.DumpDir, RESTORE_PREFIX+name)
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return 0, err

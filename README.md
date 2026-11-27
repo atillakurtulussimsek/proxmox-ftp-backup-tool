@@ -11,6 +11,14 @@ eski yedekleri temizleyen tek binary'lik web yönetim aracı.
 
 ## Nasıl çalışır?
 
+Yedekleme başlamadan önce geçici klasörde bu uygulamanın önceki işlerinden kalanlar
+(başarısız ya da iptal edilen yedeklerin dosyaları, vzdump'ın yarım kalan geçici klasörleri,
+yarım kalmış geri alma indirmeleri) silinir. Bir dosya ancak adındaki zaman damgası ve son
+değişiklik zamanı uygulamanın geçmişteki bir yedekleme işinin süresine denk geliyorsa silinir;
+"Proxmox'a geri al" ile indirilen arşivler, elle konan dosyalar ve Proxmox'un kendi
+yedekleme işlerinin dosyaları korunur. İş geçmişi saklama süresinden (varsayılan 90 gün) eski
+kalıntılar tanınamaz.
+
 Yerel disk az olduğu için VM'ler **tek tek ve sırayla** işlenir:
 
 1. Geçici klasörde (varsayılan `/var/lib/vz/dump`) VM'in disk boyutu (`maxdisk`) kadar boş
@@ -191,7 +199,7 @@ bu durumda komut satırıyla geri yükleyin.
 | FTPS sertifika hatası | Kendinden imzalı sertifikada "FTPS sertifika doğrulamasını atla" seçeneğini açın. |
 | SFTP "sunucu anahtarı değişmiş" | Sunucu değiştiyse anahtarı sıfırlayın; değişmediyse araya giren bir cihaz olabilir, inceleyin. |
 | "boyut uyuşmuyor" | Uzak diskte yer kalmamış veya bağlantı kopmuş olabilir. Yerel dosyalar korunur; sorunu giderip VM'i tekrar yedekleyin, sonra geçici klasördeki eski dosyayı elle silin. |
-| Yerelde kalmış yedek dosyaları | Hatalı işlerde dosyalar silinmez. `ls -lh /var/lib/vz/dump` ile kontrol edip gereksizleri silin. |
+| Yerelde kalmış yedek dosyaları | Hatalı işlerde dosyalar o an silinmez; bir sonraki yedekleme başlarken otomatik silinir. Bu uygulamaya ait olmayan dosyalar için `ls -lh <geçici klasör>` ile kontrol edip elle silin. |
 | "Başka bir iş çalışıyor" | Kontrol Paneli'nden çalışan işi bekleyin veya iptal edin. |
 | İptal edilen yedekte VM kilitli kaldı | `qm unlock <vmid>` veya `pct unlock <vmid>`. |
 | Telegram mesajı gelmiyor | Test mesajını deneyin; bota en az bir mesaj gönderdiğinizden ve chat ID'nin doğru olduğundan emin olun. |
